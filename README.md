@@ -1,225 +1,254 @@
 # ScreenCam
 
-A small macOS app that records your screen together with a **draggable, circular camera
-bubble** — written in C++20 / Objective-C++ and built with CMake.
+A cross-platform screen recorder with a **draggable camera bubble** — C++20 + Qt 6 (QML),
+built with CMake. Runs on **macOS, Windows and Linux** from the same code.
 
-- Pick the **screen**, the **resolution** (720p · 1080p · 1440p · 4K · Native Retina),
-  the **camera** (built-in FaceTime HD, USB webcam, iPhone Continuity Camera) and the
-  **microphone**.
-- Your camera shows in a **circle** you can drag anywhere — it is recorded exactly where you
-  put it. Right-click the bubble for Small / Medium / Large.
-- **Camera mode — Landscape or Portrait** — decides the framing of a second file that
-  contains only you (16:9 or 9:16, cut from the centre of the camera image).
-- The settings window is **hidden from the recording**, so it can stay open while you record.
+**What you can do**
 
-Every recording produces (in `~/Movies/ScreenCam/`):
-
-| File | Contents |
-| --- | --- |
-| `ScreenCam <date> - Screen.mov` | screen at the chosen resolution + the bubble + mic audio |
-| `ScreenCam <date> - Camera (Portrait).mov` | only the camera, 9:16 or 16:9, + mic audio (only when a camera is selected) |
-
-Requires **macOS 13 Ventura or newer** (ScreenCaptureKit) and the Xcode Command Line Tools.
+- Record **Screen + Camera**, **Screen only**, or **Camera only** (landscape 16:9 or portrait 9:16).
+- Pick the **screen**, **camera** (built-in FaceTime HD, USB webcam, iPhone Continuity Camera…)
+  and **microphone** (with a live level meter). Device lists update when you plug things in.
+- Style the bubble like Loom / Screen Studio: **circle, squircle, portrait or landscape**
+  frame, **size**, **corner roundness**, **border** width + colour, **drop shadow**, **mirror**.
+- **Drag** the bubble anywhere on the live preview (it snaps to edges/centre) or **resize**
+  it with its corner handle. You can even move it *while* recording.
+- **Resolution** 720p / 1080p / 1440p / 4K / Native, **24 / 30 / 60 fps**, **countdown**
+  (off / 3 / 5 / 10 s), **pause / resume**, choose the **output folder**.
+- The window can **hide while recording**; control it from the **menu-bar / tray icon** or
+  with **⌘⇧R / Ctrl+Shift+R** (start/stop) and **⌘⇧P / Ctrl+Shift+P** (pause).
+- Output: **MP4 (H.264 + AAC)** — plays in QuickTime, Windows, browsers and phones.
+  Files are named `ScreenCam 2026-11-12 at 18.42.05.mp4`.
 
 ---
 
-## Build, run, test
+## Build and install
+
+Requirements: **Qt 6.8 or newer** with the **Qt Multimedia** module, **CMake ≥ 3.24**,
+**Ninja**, and a C++20 compiler.
+
+### macOS
 
 ```bash
-cmake -S . -B build -G Ninja          # or omit -G Ninja to use Makefiles
-cmake --build build
-open build/ScreenCam.app              # use `open`, see "Permissions" below
+brew install qt cmake ninja
+cmake --preset release
+cmake --build --preset release
+open build/release/ScreenCam.app
 
-ctest --test-dir build --output-on-failure   # unit tests for the portable C++ core
+# Install a self-contained copy (Qt is copied into the bundle):
+cmake --install build/release --prefix ~/Applications
 ```
 
-`build/compile_commands.json` is generated, so **clangd in Neovim** understands the
-Objective-C++ files too (point clangd at `build/` or symlink the file to the repo root).
+Permissions: macOS asks for **Camera** and **Microphone** the first time. **Screen Recording**
+must be enabled in *System Settings ▸ Privacy & Security ▸ Screen & System Audio Recording*;
+then quit and reopen ScreenCam. The build is ad-hoc signed, so after reinstalling a new build
+macOS may ask again (remove and re-add ScreenCam in that list if the preview stays black).
 
-### Permissions (read this once)
+### Windows
 
-macOS asks for three permissions: **Camera**, **Microphone** and **Screen Recording**.
+Install Visual Studio 2022 (C++ workload) and Qt 6.8+ for *MSVC 2022 64-bit* with
+*Qt Multimedia* (Qt Online Installer). In an **x64 Native Tools Command Prompt**:
 
-1. Launch with `open build/ScreenCam.app`. If you start the binary inside the bundle from
-   your terminal, macOS attributes the permission to *Ghostty/Terminal* instead of ScreenCam.
-2. Screen Recording can only be granted in **System Settings ▸ Privacy & Security ▸ Screen &
-   System Audio Recording**. After enabling it, **quit and reopen** ScreenCam.
-3. The build is *ad-hoc signed* (CMake runs `codesign --sign -` after linking). macOS keys
-   permissions to that signature, so after a rebuild it may ask again. If Screen Recording
-   seems "on" but doesn't work, remove ScreenCam from that list with `–` and add it again.
+```bat
+cmake --preset release -DCMAKE_PREFIX_PATH=C:/Qt/6.8.3/msvc2022_64
+cmake --build --preset release
+cmake --install build/release --prefix "%LOCALAPPDATA%/Programs/ScreenCam"
+```
+
+### Linux
+
+Use Qt 6.8+ (Qt Online Installer, or a distro that ships it, e.g. Arch or recent Fedora;
+Ubuntu 24.04's Qt 6.4 is too old).
+
+```bash
+cmake --preset release -DCMAKE_PREFIX_PATH=$HOME/Qt/6.8.3/gcc_64
+cmake --build --preset release
+cmake --install build/release --prefix ~/.local     # adds a launcher + icon
+```
+
+Screen capture on Linux goes through Qt's FFmpeg backend; on a **Wayland** session it may not
+be able to capture the screen with Qt 6.8 — use an X11 session if the preview stays black.
+
+### Packages and CI
+
+`cmake --build build/release --target package` creates a `.dmg` (macOS), `.zip` (Windows) or
+`.tar.gz` (Linux). After you push to GitHub, **Actions** builds, tests and packages all three
+platforms on every push to `main` — download them from the run's *Artifacts*.
+
+### Tests
+
+```bash
+cmake --preset dev && cmake --build --preset dev && ctest --preset dev
+```
+
+| Test | What it proves |
+| --- | --- |
+| `core_tests` | sizes, bubble geometry, snapping, crop, NV12 colours, meter maths |
+| `tst_compositor` | pixels: circle mask, border, mirror, crop, NV12 format, pause-aware timestamps |
+| `tst_pipeline` | a real MP4 is written: duration excludes the pause, 640×360, decoded colours correct |
+| `ui_smoke` | the whole QML UI loads headless with **zero** QML warnings (`ScreenCam --self-test`) |
+
+clangd (Neovim) reads `build/<preset>/compile_commands.json`; `.clang-format` matches the style.
 
 ---
 
 ## How it works
 
-### The key idea: the bubble is a real window
-
-There are two ways to put a circle of camera video into a screen recording:
-
-1. Capture screen and camera separately and **draw** the circle into every screen frame.
-2. Show the camera in an actual on-screen window shaped like a circle, and simply **record the
-   screen**.
-
-ScreenCam does (2). Whatever you see is what gets recorded — dragging the bubble *is* moving
-it in the video, with zero per-frame compositing code. The only window we must keep out of the
-recording is the control panel, and ScreenCaptureKit can exclude specific windows.
-
-### Data flow while recording
+### The big picture
 
 ```
- ScreenCaptureKit ──BGRA frames (host clock)──────────┐
-                                                       ├─▶ RecordingSession ─▶ MovieWriter "Screen.mov"
- Mic (AVCaptureSession) ──48 kHz PCM──retime──────────┤        │   (audio fanned out to both)
-                                                       │        ▼
- Camera (AVCaptureSession) ──NV12 frames──retime──────┴─▶ MovieWriter "Camera (…).mov"
-          │
-          └──▶ AVCaptureVideoPreviewLayer ─▶ CameraBubbleWindow (mirrored, always visible)
+ QScreenCapture ─► QVideoSink ─┬─► QML preview (VideoOutput)            CaptureSources
+ QCamera        ─► QVideoSink ─┤                                        (main thread)
+                               └─► latest frames ─────────────┐
+                                                              ▼
+   BubbleStyle (shape, size, position…) ─────────► FrameCompositor     (own thread)
+                                                   paint canvas → NV12 → timestamp
+                                                              │
+ QAudioInput (mic) ──► QMediaCaptureSession ◄── QVideoFrameInput ◄──┘   RecordingPipeline
+                              │
+                              ▼
+                       QMediaRecorder  →  MP4 (H.264 + AAC)
 ```
+
+### Why the bubble is *composited*, not a floating window
+
+The macOS-only first version (tag `archive/macos-native`) put the camera in a real
+always-on-top window and simply recorded the screen. That doesn't port: hiding the control
+window from the capture is OS-specific, and Wayland doesn't even let apps position windows.
+So now the screen and camera are captured **separately** and painted together:
+
+- the preview in the app shows exactly the final framing (same geometry code, see below),
+- you can restyle or drag the bubble mid-recording and the video follows,
+- Camera-only mode is just another layout of the same compositor.
+
+### Two experiments that shaped the encoder path
+
+1. **Timestamps.** Frames pushed through `QVideoFrameInput` *without* timestamps are timed
+   by frame count: 30 frames sent in 0.3 s came out as a 1.0 s video. With explicit
+   `startTime`/`endTime` they came out at exactly 3.0 s. Real frames never arrive perfectly
+   evenly, so every frame is stamped with the real elapsed time — otherwise the video drifts
+   away from the microphone audio.
+2. **Pixel format.** Sending RGB frames made x264 choose **4:4:4**, which QuickTime refuses
+   to play. Converting every frame to **NV12 (4:2:0, BT.709)** gives a standard
+   *High profile, yuv420p* stream that plays everywhere.
 
 ### Layers
 
 ```
-src/core/       pure C++20, no Apple headers — all the "math", unit-tested with CTest
-src/platform/   Objective-C++ wrappers over AVFoundation / ScreenCaptureKit / CoreMedia
-src/recording/  encoding to .mov and orchestration of one recording
-src/ui/         AppKit windows (control panel, camera bubble)
-src/app/        entry point + AppDelegate that wires everything together
+src/core/    pure C++20, no Qt — maths only, unit-tested anywhere
+src/media/   Qt Gui + Multimedia, no QML — compositing and encoding (tested headless)
+src/app/     QML-facing singletons: settings, devices, capture, recorder
+qml/         the UI (Basic style + Theme.qml, identical on every OS)
 ```
 
-Dependencies only point downwards (`app → ui/recording → platform → core`), which is why
-`core` builds and tests on any OS.
+Dependencies point downwards only: `qml → app → media → core`.
 
 ---
 
 ## Walkthrough, file by file
 
-### `src/core/` — the portable C++ core
+### `src/core/` — the maths (no Qt)
 
-**`Resolution.hpp/.cpp`**
-- `PixelSize` — width/height in *physical* pixels. macOS APIs mostly speak in *points*
-  (on Retina, 1 point = 2×2 pixels); mixing the two is the classic bug this type avoids.
-- `resolutionOptions()` — the presets shown in the UI, as one table (label + target height),
-  so UI and logic can't disagree.
-- `makeEven(v)` — H.264/HEVC store colour at half resolution (4:2:0), so both dimensions must
-  be even. Rounds down, minimum 2.
-- `computeCaptureSize(display, preset)` — the screen file's size. The preset fixes the
-  *height*; the width is scaled by the same factor, so a 16:10 MacBook screen at "720p"
-  becomes 1108×720 rather than a stretched 1280×720. It never upscales (4K on a 1080p
-  display stays 1080p) and always returns even numbers.
+- **`Resolution`** — `computeCaptureSize(display, preset)`: the preset fixes the *height*, the
+  width scales by the same factor (a 16:10 screen at "720p" → 1108×720, not a stretched
+  1280×720); never upscales; `makeEven()` because 4:2:0 video needs even dimensions.
+- **`CameraLayout`** — `cameraRecordingSize(camera, orientation)`: largest centred 16:9 or
+  9:16 rectangle inside the camera image (1080p webcam → portrait 608×1080).
+- **`BubbleGeometry`** — the single source of truth for the bubble:
+  - `bubbleSize()` — size as a fraction of the canvas's *shorter* side, so the bubble looks
+    the same on landscape and portrait videos; rectangles get a 25% longer long side.
+  - `bubbleRect()` / `clampNormalizedCenter()` — position is a **normalized centre (0..1)**,
+    so it means the same in a 900-px preview and a 4K file; clamped 3% inside the edges.
+  - `snapNormalizedCenter()` — on release, each axis jumps to start/middle/end if close.
+  - `bubbleCornerRadius()` — circle = half the side; other shapes use *roundness*.
+  - `aspectFillCrop()` — the centred part of the camera image that fills a shape without
+    stretching.
+- **`Nv12`** — `convertXrgbToNv12()`: full-resolution Y plane + one (U,V) pair per 2×2 block
+  (averaged, so coloured text stays clean). Coefficients are BT.709 in 8.8 fixed point; each
+  chroma row is rounded to sum to **exactly 0**, so greys get no colour tint (a test caught
+  the off-by-one when it didn't).
+- **`EncoderPlan`** — `planEncoder()`: bit rate = pixels/s × bits-per-pixel, clamped 2–60 Mbit/s.
+- **`AudioLevel`** — `peakToMeterLevel()` maps a sample peak to a dB-scaled 0..1 bar
+  (-60 dBFS → 0, 0 dBFS → 1); `smoothMeterLevel()` makes it rise instantly and fall slowly.
+- **`TimeFormat`** — `formatElapsed()` → `00:42`, `1:02:03`.
 
-**`CameraLayout.hpp/.cpp`**
-- `cameraRecordingSize(camera, orientation)` — the largest centred 16:9 (landscape) or 9:16
-  (portrait) rectangle inside the camera frame. Try full height first; if the result is wider
-  than the camera (e.g. landscape from a 4:3 camera), use full width instead.
-  Example: 1920×1080 webcam → portrait = 1080·9/16 = 607.5 → **608×1080**.
+### `src/media/` — painting and encoding
 
-**`EncoderPlan.hpp/.cpp`**
-- `requiresHevc(size)` — Apple's H.264 encoder tops out around 4096×2304; "Native" on a 5K
-  display needs HEVC. Compares long/short sides so portrait sizes work too.
-- `planEncoder(size, fps)` — bit rate = pixels per second × bits-per-pixel (0.1 for H.264,
-  0.07 for HEVC), clamped to 2–60 Mbit/s; key frame every 2 s for snappy seeking.
-  1080p30 → 1920·1080·30·0.1 ≈ 6.2 Mbit/s.
+- **`FrameCompositor`** (runs on its own thread)
+  - `setScreenFrame()` / `setCameraFrame()` store the latest frames; `refreshImages()`
+    converts them to images **only when a tick needs them** (a 60 Hz screen and 30 fps camera
+    would otherwise cost conversions that are thrown away).
+  - `renderCanvas()` — paints one frame: screen scaled to the canvas, then `drawBubble()`.
+  - `drawBubble()` — (1) a cached, box-blurred **shadow** (`shadowFor()`); (2) the camera,
+    cropped by `aspectFillCrop()` and optionally mirrored, masked by a cached **anti-aliased
+    mask image** (`maskFor()`) with `DestinationIn` — a mask *image*, because composition
+    modes only affect pixels a fill touches, so a path alone would leave the corners;
+    (3) the **border**, drawn inside the shape like a QML border.
+  - `toNv12Frame()` — canvas → NV12 `QVideoFrame` tagged BT.709 / video range.
+  - `tick()` / `activeMicroseconds()` — a `PreciseTimer` drives the frame rate; each frame is
+    stamped with elapsed time **minus paused time**, so pauses never appear in the video.
+- **`RecordingPipeline`** — wires `QVideoFrameInput` + optional `QAudioInput` into a
+  `QMediaCaptureSession` with a `QMediaRecorder` (MP4/H.264/AAC).
+  - `start()` configures the recorder and compositor (blocking call so the first frame is
+    right), starts recording, then starts the compositor clock.
+  - `sendFrame()` drops a frame when the encoder queue is full instead of blocking.
+  - `pause()`/`resume()` pause both the recorder (audio) and the compositor clock (video).
+  - `stop()` waits for the compositor to stop, then `finish()` reports `finished(path)` or
+    `failed(message)`.
+- **`BubbleStyleSnapshot`** — a plain copy of the bubble style that is safe to hand to the
+  compositor thread; `borderPixels()` scales the border with the canvas.
 
-**`TimeFormat.hpp/.cpp`**
-- `formatElapsed(seconds)` — `00:42`, `12:03`, `1:02:03` for the status label.
+### `src/app/` — what QML talks to (all singletons)
 
-**`tests/core_tests.cpp`** — a tiny `CHECK` macro and one test function per module; run by
-CTest. Every number in the examples above is asserted there.
+- **`DeviceCatalog`** (`Devices`) — cameras/microphones/screens as `{id, name}` lists (with a
+  "None" entry), refreshed on hot-plug; `requestPermissions()` (camera, then mic);
+  `findCamera()/findMicrophone()/findScreen()` turn stored ids back into devices;
+  `screenPixelSize()` = logical size × device pixel ratio.
+- **`RecordingSettings`** — every sidebar choice, saved with `QSettings` through one
+  `assign()` template (skip no-ops, persist, notify).
+- **`BubbleStyle`** — the bubble's look/position, persisted; `rectFor()`, `radiusFor()`,
+  `borderFor()`, `moveCenter()`, `snap()`, `placeInCorner()` are thin wrappers over
+  `core/BubbleGeometry` so QML and the compositor compute identical geometry. `revision`
+  lets QML bindings that call these functions re-evaluate on any change.
+- **`CaptureSources`** (`Capture`) — runs the screen capture and camera only while the
+  preview is visible or a recording runs (camera light off otherwise); fans each frame out to
+  QML previews and to the recorder; `pickCameraFormat()` chooses ≤1080p at ≥24 fps;
+  `outputSize()` asks the core for the final video size.
+- **`AudioLevelMeter`** — a `QAudioSource` on the selected mic; peak per chunk via
+  `QAudioFormat::normalizedSampleValue()` (works for any sample format).
+- **`RecordingController`** (`Recorder`) — state machine
+  `Idle → Countdown → Recording ⇄ Paused → Finalizing → Idle`. `start()` validates and
+  keeps inputs alive; `beginRecording()` hides the window (with a short delay so the minimize
+  animation isn't recorded), snapshots settings into a pipeline request and starts it;
+  bubble edits during recording are forwarded live; `nextOutputPath()` names files.
+- **`main.cpp`** — `QApplication` (the tray icon needs Widgets on Windows/Linux), Basic
+  style, window icon, and `--self-test` (load the UI, exit non-zero on QML warnings).
 
-### `src/platform/` — talking to the OS
+### `qml/`
 
-**`DeviceCatalog`** — read-only hardware queries.
-- `cameras` / `microphones` — `AVCaptureDeviceDiscoverySession` with the right device types
-  (on macOS 14+: built-in, external and Continuity Camera; on 13: the older types). Results
-  are de-duplicated by `uniqueID` because one device can match two types.
-- `displays` + `pixelSizeForDisplay:` — `NSScreen` for names, `CGDisplayCopyDisplayMode` for
-  the *real* pixel count.
-- `screenForDisplayID:` / `displayIDForScreen:` — translate between AppKit's `NSScreen` and
-  CoreGraphics' `CGDirectDisplayID` (needed to put the bubble on the recorded screen).
-
-**`CameraCapture`** — one long-lived camera session.
-- `switchToDeviceWithUniqueID:completion:` — swaps the input inside
-  `beginConfiguration`/`commitConfiguration` on a background queue (because `startRunning`
-  blocks), picks 1080p → 720p → best preset, then starts/stops the session.
-- `applyMirroring` — mirrors only the *preview* (people expect a mirror), not recorded frames.
-- `frameSink` — while recording, `RecordingSession` is attached here and receives every frame;
-  otherwise frames are dropped and only the preview runs.
-
-**`MicCapture`** — one microphone, created per recording so the mic indicator is only on
-while you record. `audioSettings` (a macOS-only feature) forces every mic to deliver 48 kHz
-mono 16-bit PCM, so the AAC encoder settings always match.
-
-**`ScreenCapture`** — wraps `SCStream`.
-- Step 1 `SCShareableContent` lists displays/windows (and triggers the permission check).
-- Step 2 builds an `SCContentFilter` for the display **excluding the control panel window**,
-  and an `SCStreamConfiguration` with the size from `computeCaptureSize`, 30 fps, BGRA, cursor.
-- `IsCompleteFrame` — ScreenCaptureKit only sends new pixels when the screen changes and also
-  delivers "idle" buffers without an image; only `Complete` frames are passed on.
-
-**`ClockSync`** — `SCCopySampleBufferOnHostClock` converts a buffer's timestamps from a
-capture session's clock to the host clock (the clock ScreenCaptureKit uses). AVAssetWriter
-places samples on the timeline *only* by timestamp, so all sources must share one clock or
-the audio would drift. It's a shallow copy — the pixels/audio are not duplicated.
-
-**`Bridging.h` / `Errors.h`** — `SCString()` (C++ string → `NSString`) and `SCMakeError()`.
-
-### `src/recording/`
-
-**`MovieWriter`** — one `.mov` = one `AVAssetWriter` with an H.264/HEVC video input and an
-optional AAC input.
-- **Crop for free:** `AVVideoScalingModeResizeAspectFill` makes the encoder scale incoming
-  frames to *fill* the output size and crop the overflow from the centre. That is how the
-  608×1080 portrait file is cut from a 1920×1080 webcam without touching a pixel ourselves.
-- `appendVideoSampleBuffer:` — the first video frame calls `startSessionAtSourceTime:` and
-  becomes t = 0; later frames must have strictly increasing timestamps; if the encoder is
-  busy the frame is dropped rather than stalling the camera.
-- `appendAudioSampleBuffer:` — ignores audio from before the first video frame.
-- `finishAtSourceTime:` — ends the movie at the *moment Stop was pressed*, not at the last
-  frame. A static screen produces few frames; without this the video would end early.
-- A lock (`@synchronized`) serializes appends, because screen, camera and mic call in from
-  three different queues.
-
-**`RecordingSession`** — one recording from Start to Stop.
-- `prepareWritersWithError:` — creates `~/Movies/ScreenCam`, asks the core for both sizes,
-  creates the writers.
-- `startWithCompletion:` — mic first (it takes a moment), then attaches to the camera, then
-  starts the screen stream. Any failure tears everything down again.
-- Sinks — screen frames go straight to the screen writer; camera frames are retimed, then go
-  to the camera writer; mic audio is retimed and **fanned out to both** writers.
-- `stopWithCompletion:` — records the stop time, detaches camera + mic, stops the stream,
-  finalizes all writers in parallel (`dispatch_group`) and reports the saved files.
-
-### `src/ui/`
-
-**`CameraBubbleWindow`** — an `NSPanel` that is borderless + **non-activating** (dragging it
-doesn't steal focus from the app you're presenting), transparent, floating above all apps and
-on every Space. Its content view is *layer-hosting*: a `CALayer` with
-`cornerRadius = diameter / 2` and `masksToBounds` turns the square preview into a circle, and
-its border draws the white ring. `mouseDown:` hands the event to
-`performWindowDragWithEvent:` so the window server moves it smoothly. `placeOnScreen:` puts it
-in the bottom-left of the recorded display unless it's already there.
-
-**`ControlPanelController`** — the settings window built in code with `NSGridView`. Device
-ids are stored in each menu item's `representedObject` (`nil` = "None").
-`reloadSources` keeps your selection across hot-plugs. It only *reports* changes through
-`ControlPanelDelegate`; it never touches capture objects itself.
-
-### `src/app/`
-
-**`main.mm`** — creates `NSApplication`, sets the delegate, runs the event loop.
-
-**`AppDelegate`** — the glue.
-- Launch: builds the menu, creates camera + bubble + panel, requests permissions.
-- `applySelection` — makes the camera session and the bubble match the panel.
-- `startRecording` — snapshots the panel into `RecordingOptions` (excluding the panel window)
-  and starts a `RecordingSession`; a 0.5 s timer updates `● Recording 00:42`.
-- `applicationShouldTerminate:` — quitting mid-recording first finishes the files
-  (`NSTerminateLater`), because a `.mov` is unreadable until its index is written at the end.
+- **`Main.qml`** — layout, tray icon (`Qt.labs.platform`), shortcuts, hide/show handling.
+- **`PreviewStage.qml`** — letter-boxed canvas with the output's aspect ratio, live screen,
+  camera-only view, snap guides while dragging.
+- **`CameraBubble.qml`** — `VideoOutput` masked with `MultiEffect`, shadow, border, drag with
+  `DragHandler` (normalized deltas → `BubbleStyle.moveCenter`), resize handle placed where the
+  shape's edge crosses the diagonal (`radius × (1 − 1/√2)` in from the corner).
+- **`SettingsPanel.qml`, `BubbleSection.qml`** — the sidebar. **`ControlBar.qml`** — record
+  button, timer (tabular digits so it doesn't jiggle), pause/stop, play last recording.
+- **`components/`** — themed controls. `StyledComboBox` re-binds `currentIndex` after a pick,
+  because a ComboBox assigns its own index on click and would otherwise break the binding to
+  the setting.
 
 ---
 
-## Branches
+## Troubleshooting
 
-Each feature was developed on its own branch and merged into `main` with `--no-ff`:
-`feature/app-skeleton` → `feature/core-settings` → `feature/device-selection` →
-`feature/camera-bubble` → `feature/screen-recording` → `docs/readme`.
+- **Black screen preview on macOS** — grant Screen Recording (see above) and reopen the app.
+- **Log lines `Packet with invalid duration … in stream 0`** — printed by FFmpeg's MP4 muxer
+  for B-frames that Qt 6.8 doesn't give a duration. Harmless: `tst_pipeline` checks that
+  frame times increase and the file plays with the right duration.
+- **High CPU at 4K / 60 fps** — painting and colour conversion run on the CPU; 1080p/30 is
+  light, 4K/60 is demanding on older machines.
+
+## History
+
+Every feature was developed on its own branch and merged into `main` with `--no-ff`. The first,
+macOS-only Objective-C++ version is kept under the tag `archive/macos-native`.
