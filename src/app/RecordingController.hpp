@@ -1,8 +1,10 @@
 #pragma once
 
+#include "core/BubbleGeometry.hpp"
 #include "media/RecordingPipeline.hpp"
 
 #include <QElapsedTimer>
+#include <QPointF>
 #include <QObject>
 #include <QTimer>
 #include <QtQml/qqmlregistration.h>
@@ -54,6 +56,11 @@ public:
     Q_INVOKABLE void cancelCountdown();
     Q_INVOKABLE void openLastRecording() const;
     Q_INVOKABLE void clearError();
+    /// Where the floating camera bubble's centre is on the desktop (global logical coords).
+    Q_INVOKABLE void setBubbleDesktopCenter(const QPointF &center);
+    /// That position as a normalized centre inside what is recorded (screen or region), to
+    /// seed the editor's layout; a corner default when it isn't inside (or for windows).
+    screencam::core::PointD bubbleCenterInTarget() const;
 
 signals:
     void stateChanged();
@@ -86,4 +93,5 @@ private:
     qint64 m_pauseStartedMs = -1;
     QString m_lastRecording;
     QString m_errorString;
+    QPointF m_bubbleDesktopCenter{-1.0, -1.0};
 };

@@ -1,10 +1,8 @@
 import QtQuick
-import QtQuick.Effects
-import QtMultimedia
 
-// The camera bubble on top of the screen preview.
-//  - Geometry comes from BubbleStyle.rectFor(), the same C++ function the recorder uses,
-//    so what you see here is what lands in the video.
+// A camera bubble placed on a canvas (the editor's preview): geometry + drag/resize.
+//  - Geometry comes from `bubbleStyle.rectFor()` — a BubbleStyle object, the same C++ geometry
+//    the exporter uses — so what you see here is what lands in the video.
 //  - Drag it anywhere; on release it snaps to edges/centre (BubbleStyle.snap).
 //  - Drag the round handle (bottom-right, shown on hover) to resize.
 Item {
@@ -12,16 +10,21 @@ Item {
 
     // Size of the preview canvas this bubble lives on (in item pixels).
     property size canvasSize: Qt.size(1, 1)
+    // Any object with BubbleStyle's API (the editor passes the current segment's style).
+    property var bubbleStyle: BubbleStyle
+    property bool live: true
+    property string placeholderText: ""
+    readonly property alias video: look.video
 
     // QML can't see inside C++ function calls, so a binding like rectFor(...) alone would never
-    // update when the style changes. Reading BubbleStyle.revision (bumped on every change, and
+    // update when the style changes. Reading bubbleStyle.revision (bumped on every change, and
     // always >= 0) makes it part of each binding's dependencies.
-    readonly property rect area: BubbleStyle.revision >= 0
-                                 ? BubbleStyle.rectFor(canvasSize.width, canvasSize.height)
+    readonly property rect area: bubbleStyle.revision >= 0
+                                 ? bubbleStyle.rectFor(canvasSize.width, canvasSize.height)
                                  : Qt.rect(0, 0, 0, 0)
-    readonly property real cornerRadius: BubbleStyle.revision >= 0 ? BubbleStyle.radiusFor(area.width, area.height) : 0
-    readonly property real borderWidth: BubbleStyle.revision >= 0
-                                        ? BubbleStyle.borderFor(canvasSize.width, canvasSize.height)
+    readonly property real cornerRadius: bubbleStyle.revision >= 0 ? bubbleStyle.radiusFor(area.width, area.height) : 0
+    readonly property real borderWidth: bubbleStyle.revision >= 0
+                                        ? bubbleStyle.borderFor(canvasSize.width, canvasSize.height)
                                         : 0
     readonly property bool dragging: moveDrag.active || resizeDrag.active
 
@@ -36,92 +39,16 @@ Item {
     Behavior on width { enabled: !bubble.dragging; NumberAnimation { duration: Theme.animationNormal; easing.type: Easing.OutCubic } }
     Behavior on height { enabled: !bubble.dragging; NumberAnimation { duration: Theme.animationNormal; easing.type: Easing.OutCubic } }
 
-    // --- Shadow: a blurred copy of the shape, offset downwards ---------------------------
-    Rectangle {
-        id: shadowShape
+    BubbleView {
+        id: look
         anchors.fill: parent
-        radius: bubble.cornerRadius
-        color: "black"
-        visible: false
-    }
-
-    MultiEffect {
-        anchors.fill: shadowShape
-        source: shadowShape
-        visible: BubbleStyle.shadow
-        shadowEnabled: true
-        shadowColor: "black"
-        shadowOpacity: 0.55
-        shadowBlur: 1.0
-        shadowVerticalOffset: Math.max(2, bubble.height * 0.03)
-        autoPaddingEnabled: true
-    }
-
-    // --- Placeholder until the camera delivers frames ------------------------------------
-    Rectangle {
-        anchors.fill: parent
-        radius: bubble.cornerRadius
-        color: Theme.surfaceRaised
-        visible: !Capture.cameraActive
-
-        Text {
-            anchors.centerIn: parent
-            width: parent.width * 0.8
-            horizontalAlignment: Text.AlignHCenter
-            wrapMode: Text.WordWrap
-            text: Capture.cameraError.length > 0 ? Capture.cameraError : qsTr("Camera starting…")
-            color: Theme.textMuted
-            font.pixelSize: Math.max(9, bubble.height * 0.07)
-        }
-    }
-
-    // --- Camera video, clipped to the bubble shape -----------------------------------------
-    VideoOutput {
-        id: video
-        anchors.fill: parent
-        fillMode: VideoOutput.PreserveAspectCrop  // fill the shape, crop the edges
-        visible: false                            // drawn through the mask effect below
-
-        Component.onCompleted: Capture.addCameraPreview(videoSink)
-        Component.onDestruction: Capture.removeCameraPreview(videoSink)
-    }
-
-    Item {
-        id: mask
-        anchors.fill: parent
-        visible: false
-        layer.enabled: true
-
-        Rectangle {
-            anchors.fill: parent
-            radius: bubble.cornerRadius
-            color: "black"
-        }
-    }
-
-    MultiEffect {
-        anchors.fill: parent
-        visible: Capture.cameraActive
-        source: video
-        maskEnabled: true
-        maskSource: mask
-        maskThresholdMin: 0.5
-        maskSpreadAtMin: 1.0
-        // Mirroring the whole masked result is fine: every shape is left/right symmetric.
-        transform: Scale {
-            origin.x: bubble.width / 2
-            xScale: BubbleStyle.mirrored ? -1 : 1
-        }
-    }
-
-    // --- Border ring --------------------------------------------------------------------
-    Rectangle {
-        anchors.fill: parent
-        radius: bubble.cornerRadius
-        color: "transparent"
-        visible: bubble.borderWidth >= 0.5
-        border.width: bubble.borderWidth
-        border.color: BubbleStyle.borderColor
+        cornerRadius: bubble.cornerRadius
+        borderWidth: bubble.borderWidth
+        borderColor: bubble.bubbleStyle.borderColor
+        shadowEnabled: bubble.bubbleStyle.shadow
+        mirrored: bubble.bubbleStyle.mirrored
+        live: bubble.live
+        placeholderText: bubble.placeholderText
     }
 
     // Hover highlight so it's obvious the bubble can be grabbed.
@@ -151,15 +78,15 @@ Item {
         target: null
         onActiveChanged: {
             if (active) {
-                startX = BubbleStyle.centerX;
-                startY = BubbleStyle.centerY;
+                startX = bubble.bubbleStyle.centerX;
+                startY = bubble.bubbleStyle.centerY;
             } else {
-                BubbleStyle.snap(bubble.canvasSize.width, bubble.canvasSize.height);
+                bubble.bubbleStyle.snap(bubble.canvasSize.width, bubble.canvasSize.height);
             }
         }
         onTranslationChanged: {
             if (active) {
-                BubbleStyle.moveCenter(startX + translation.x / bubble.canvasSize.width,
+                bubble.bubbleStyle.moveCenter(startX + translation.x / bubble.canvasSize.width,
                                        startY + translation.y / bubble.canvasSize.height,
                                        bubble.canvasSize.width, bubble.canvasSize.height);
             }
@@ -197,13 +124,13 @@ Item {
             target: null
             onActiveChanged: {
                 if (active) {
-                    startSize = BubbleStyle.size;
+                    startSize = bubble.bubbleStyle.size;
                 }
             }
             onTranslationChanged: {
                 if (active) {
                     const shortSide = Math.min(bubble.canvasSize.width, bubble.canvasSize.height);
-                    BubbleStyle.size = startSize + (translation.x + translation.y) / shortSide;
+                    bubble.bubbleStyle.size = startSize + (translation.x + translation.y) / shortSide;
                 }
             }
         }

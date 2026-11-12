@@ -13,6 +13,7 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QJSEngine>
+#include <QScreen>
 #include <QUrl>
 
 namespace core = screencam::core;
@@ -138,6 +139,10 @@ void RecordingController::start() {
 
     // Keep the camera/screen running even when the window gets minimized.
     CaptureSources::instance()->setRecordingActive(true);
+    // Get out of the way right away: the countdown runs in the floating mini control bar.
+    if (RecordingSettings::instance()->hideWindowWhileRecording()) {
+        emit windowHideRequested();
+    }
 
     const int countdown = RecordingSettings::instance()->countdownSeconds();
     if (countdown > 0) {
@@ -152,13 +157,11 @@ void RecordingController::start() {
 
 void RecordingController::beginRecording() {
     const RecordingSettings *settings = RecordingSettings::instance();
-    const bool hide = settings->hideWindowWhileRecording();
-    if (hide) {
-        emit windowHideRequested();
-    }
+    // Without a countdown the window was hidden a moment ago: let the animation finish.
+    const bool justHidden = settings->hideWindowWhileRecording() && settings->countdownSeconds() == 0;
     setState(State::Recording);
 
-    QTimer::singleShot(hide ? kHideDelayMs : 0, this, [this] {
+    QTimer::singleShot(justHidden ? kHideDelayMs : 0, this, [this] {
         if (m_state != State::Recording || m_pipeline.isActive()) {
             return;  // stopped during the delay
         }
@@ -271,6 +274,28 @@ void RecordingController::openLastRecording() const {
     if (!m_lastRecording.isEmpty()) {
         QDesktopServices::openUrl(QUrl::fromLocalFile(m_lastRecording));
     }
+}
+
+void RecordingController::setBubbleDesktopCenter(const QPointF &center) {
+    m_bubbleDesktopCenter = center;
+}
+
+core::PointD RecordingController::bubbleCenterInTarget() const {
+    const core::PointD fallback{0.12, 0.84};  // bottom-left, like the floating bubble's start
+    const RecordingSettings *settings = RecordingSettings::instance();
+    const QScreen *screen = DeviceCatalog::findScreen(settings->screenId());
+    if (screen == nullptr || m_bubbleDesktopCenter.x() < 0.0 ||
+        settings->captureTarget() == RecordingSettings::CaptureTarget::Window) {
+        return fallback;
+    }
+    QRectF area = screen->geometry();
+    if (settings->captureTarget() == RecordingSettings::CaptureTarget::Region) {
+        area = QRectF(settings->region()).translated(screen->geometry().topLeft());
+    }
+    if (!area.contains(m_bubbleDesktopCenter) || area.isEmpty()) {
+        return fallback;
+    }
+    return {(m_bubbleDesktopCenter.x() - area.x()) / area.width(), (m_bubbleDesktopCenter.y() - area.y()) / area.height()};
 }
 
 void RecordingController::clearError() {

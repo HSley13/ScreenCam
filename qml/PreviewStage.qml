@@ -8,8 +8,6 @@ Rectangle {
     id: stage
 
     readonly property bool cameraOnly: RecordingSettings.mode === RecordingSettings.CameraOnly
-    readonly property bool showBubble: RecordingSettings.mode === RecordingSettings.ScreenAndCamera
-                                       && RecordingSettings.cameraId.length > 0
     readonly property real canvasAspect: {
         const out = Capture.outputSize;
         if (out.width > 0 && out.height > 0) {
@@ -39,6 +37,14 @@ Rectangle {
             font.pixelSize: 15
             font.weight: Font.DemiBold
             anchors.verticalCenter: parent.verticalCenter
+        }
+
+        Label {
+            anchors.verticalCenter: parent.verticalCenter
+            visible: RecordingSettings.mode === RecordingSettings.ScreenAndCamera
+            text: qsTr("Your camera floats on the desktop — place it exactly in the editor afterwards")
+            color: Theme.textMuted
+            font.pixelSize: 11
         }
 
         Rectangle {
@@ -138,40 +144,6 @@ Rectangle {
 
             }
 
-            // Safe-area outline + centre lines while dragging: the snap targets.
-            Rectangle {
-                readonly property real margin: Math.min(canvas.width, canvas.height) * 0.03
-
-                x: margin
-                y: margin
-                width: canvas.width - 2 * margin
-                height: canvas.height - 2 * margin
-                color: "transparent"
-                border.color: Theme.accent
-                border.width: 1
-                opacity: bubble.dragging ? 0.6 : 0.0
-                Behavior on opacity { NumberAnimation { duration: Theme.animationFast } }
-
-                Rectangle {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    width: 1
-                    height: parent.height
-                    color: Theme.accent
-                }
-
-                Rectangle {
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: parent.width
-                    height: 1
-                    color: Theme.accent
-                }
-            }
-
-            CameraBubble {
-                id: bubble
-                visible: stage.showBubble
-                canvasSize: stage.canvasSize
-            }
         }
     }
 }

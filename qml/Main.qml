@@ -16,6 +16,13 @@ ApplicationWindow {
 
     // macOS asks for camera/microphone access the first time; elsewhere this is a no-op.
     Component.onCompleted: Devices.requestPermissions()
+    // Never record ScreenCam's own window (this also stops the preview from showing itself
+    // in an endless loop). Re-applied whenever the window is shown again.
+    onVisibilityChanged: (visibility) => {
+        if (visibility !== Window.Hidden) {
+            WindowTools.excludeFromCapture(window);
+        }
+    }
 
     // Run the live inputs only while the window can actually be seen.
     Binding {
@@ -54,14 +61,20 @@ ApplicationWindow {
             Layout.fillHeight: true
             locked: Recorder.busy
 
-            BubbleSection {
-                canvasSize: stage.canvasSize
-            }
+            BubbleSection {}
         }
     }
 
     CountdownOverlay {
         anchors.fill: parent
+    }
+
+    MiniControlBar {}
+
+    // Your camera, floating on the desktop (only in Screen + Camera mode).
+    FloatingBubble {
+        visible: RecordingSettings.mode === RecordingSettings.ScreenAndCamera
+                 && RecordingSettings.cameraId.length > 0 && Devices.cameraAllowed
     }
 
     function bringToFront() {
