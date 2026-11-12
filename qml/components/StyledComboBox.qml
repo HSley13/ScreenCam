@@ -14,6 +14,8 @@ ComboBox {
 
     property var selectedValue
     signal picked(var value)
+    // Just before the list opens: lets lists that change on their own (open windows) refresh.
+    signal aboutToOpen()
 
     textRole: "name"
     valueRole: "id"
@@ -88,6 +90,7 @@ ComboBox {
     }
 
     popup: Popup {
+        onAboutToShow: control.aboutToOpen()
         y: control.height + 4
         width: control.width
         padding: 6
