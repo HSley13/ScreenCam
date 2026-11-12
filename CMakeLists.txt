@@ -61,6 +61,13 @@ if(SCREENCAM_BUILD_APP)
     set(SCREENCAM_QML_FILES
         qml/Main.qml
         qml/Theme.qml
+        qml/components/Field.qml
+        qml/components/LevelMeter.qml
+        qml/components/SegmentedControl.qml
+        qml/components/SidebarSection.qml
+        qml/components/StyledButton.qml
+        qml/components/StyledComboBox.qml
+        qml/components/StyledSwitch.qml
     )
     set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
