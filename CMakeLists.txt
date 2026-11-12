@@ -55,6 +55,7 @@ if(SCREENCAM_BUILD_APP)
 
     set(SCREENCAM_APP_SOURCES
         src/app/AudioLevelMeter.cpp src/app/AudioLevelMeter.hpp
+        src/app/BubbleStyle.cpp src/app/BubbleStyle.hpp
         src/app/DeviceCatalog.cpp src/app/DeviceCatalog.hpp
         src/app/RecordingSettings.cpp src/app/RecordingSettings.hpp
     )
