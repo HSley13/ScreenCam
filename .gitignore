@@ -1,0 +1,15 @@
+# CMake build trees
+build/
+build-*/
+cmake-build-*/
+
+# clangd / editor caches (compile_commands.json is generated into build/)
+.cache/
+compile_commands.json
+
+# macOS
+.DS_Store
+
+# Recordings accidentally saved next to the sources
+*.mov
+*.mp4
