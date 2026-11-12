@@ -53,10 +53,22 @@ if(SCREENCAM_BUILD_APP)
     find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Widgets Qml Quick QuickControls2 Multimedia)
     qt_standard_project_setup(REQUIRES 6.8)
 
+    # Screen capture (QScreenCapture) and recording composited frames (QVideoFrameInput) only
+    # exist in Qt Multimedia's FFmpeg backend. Qt builds without it (Homebrew's, or Qt compiled
+    # from source without -ffmpeg-dir) build fine but show an empty screen preview at runtime.
+    if(NOT TARGET Qt6::QFFmpegMediaPlugin)
+        message(WARNING
+            "The Qt found at ${Qt6_DIR} has no FFmpeg multimedia backend (Qt6::QFFmpegMediaPlugin).\n"
+            "ScreenCam will build, but it cannot capture the screen or record.\n"
+            "Fix: use Qt from the Qt Online Installer, or rebuild Qt with '-ffmpeg-dir <ffmpeg-prefix>'.\n"
+            "See README.md > Troubleshooting.")
+    endif()
+
     # Media library: compositing + encoding, Qt-only (no QML) so the tests can link it.
     add_library(screencam_media STATIC
         src/media/BubbleStyleSnapshot.cpp src/media/BubbleStyleSnapshot.hpp
         src/media/FrameCompositor.cpp src/media/FrameCompositor.hpp
+        src/media/MediaBackendCheck.cpp src/media/MediaBackendCheck.hpp
         src/media/RecordingPipeline.cpp src/media/RecordingPipeline.hpp
     )
     target_include_directories(screencam_media PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
