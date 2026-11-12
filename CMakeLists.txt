@@ -49,6 +49,7 @@ if(APPLE)
     set(SCREENCAM_APP_SOURCES
         src/app/main.mm
         src/app/AppDelegate.mm
+        src/platform/DeviceCatalog.mm
     )
 
     add_executable(ScreenCam MACOSX_BUNDLE ${SCREENCAM_APP_SOURCES})
@@ -58,7 +59,9 @@ if(APPLE)
         -Wall -Wextra -Wno-unused-parameter)
     target_link_libraries(ScreenCam PRIVATE
         screencam_core
-        "-framework AppKit")
+        "-framework AppKit"
+        "-framework AVFoundation"
+        "-framework CoreGraphics")
 
     set_target_properties(ScreenCam PROPERTIES
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Info.plist.in"
