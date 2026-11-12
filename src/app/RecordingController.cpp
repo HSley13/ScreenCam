@@ -5,6 +5,7 @@
 #include "app/DeviceCatalog.hpp"
 #include "app/RecordingSettings.hpp"
 #include "core/EncoderPlan.hpp"
+#include "core/Resolution.hpp"
 #include "core/TimeFormat.hpp"
 
 #include <QCoreApplication>
@@ -50,7 +51,7 @@ RecordingController::RecordingController(QObject *parent)
     m_elapsedTicker.setInterval(250);
     connect(&m_elapsedTicker, &QTimer::timeout, this, &RecordingController::elapsedChanged);
 
-    // Live inputs -> pipeline (only while it records).
+    // Live inputs -> pipelines (only while they record).
     CaptureSources *capture = CaptureSources::instance();
     connect(capture, &CaptureSources::screenFrameArrived, this, [this](const QVideoFrame &frame) {
         if (m_pipeline.isActive()) {
@@ -58,26 +59,23 @@ RecordingController::RecordingController(QObject *parent)
         }
     });
     connect(capture, &CaptureSources::cameraFrameArrived, this, [this](const QVideoFrame &frame) {
-        if (m_pipeline.isActive()) {
-            m_pipeline.pushCameraFrame(frame);
-        }
-    });
-    // Dragging/restyling the bubble during a recording shows up in the video.
-    connect(BubbleStyle::instance(), &BubbleStyle::styleChanged, this, [this] {
-        if (m_pipeline.isActive()) {
-            m_pipeline.updateBubble(BubbleStyle::instance()->snapshot());
+        if (m_cameraPipeline.isActive()) {
+            m_cameraPipeline.pushCameraFrame(frame);  // project: its own file
+        } else if (m_pipeline.isActive()) {
+            m_pipeline.pushCameraFrame(frame);  // Camera-only mode
         }
     });
 
-    connect(&m_pipeline, &RecordingPipeline::finished, this, [this](const QString &path) {
-        m_lastRecording = path;
-        emit lastRecordingChanged();
-        finish();
-    });
-    connect(&m_pipeline, &RecordingPipeline::failed, this, [this](const QString &message) {
-        setError(message);
-        finish();
-    });
+    connect(&m_pipeline, &RecordingPipeline::clockStarted, this, [this](qint64 ms) { m_screenClockMs = ms; });
+    connect(&m_cameraPipeline, &RecordingPipeline::clockStarted, this, [this](qint64 ms) { m_cameraClockMs = ms; });
+    connect(&m_pipeline, &RecordingPipeline::finished, this,
+            [this](const QString &path) { onPipelineDone(false, QString(), path); });
+    connect(&m_pipeline, &RecordingPipeline::failed, this,
+            [this](const QString &message) { onPipelineDone(false, message, QString()); });
+    connect(&m_cameraPipeline, &RecordingPipeline::finished, this,
+            [this](const QString &path) { onPipelineDone(true, QString(), path); });
+    connect(&m_cameraPipeline, &RecordingPipeline::failed, this,
+            [this](const QString &message) { onPipelineDone(true, message, QString()); });
 }
 
 QString RecordingController::elapsedText() const {
@@ -162,47 +160,146 @@ void RecordingController::beginRecording() {
     setState(State::Recording);
 
     QTimer::singleShot(justHidden ? kHideDelayMs : 0, this, [this] {
-        if (m_state != State::Recording || m_pipeline.isActive()) {
-            return;  // stopped during the delay
-        }
-        const RecordingSettings *settings = RecordingSettings::instance();
-        const CaptureSources *capture = CaptureSources::instance();
-
-        RecordingPipeline::Request request;
-        request.compositor.canvasSize = capture->outputSize();
-        request.compositor.sourceCrop = capture->sourceCrop();
-        request.compositor.framesPerSecond = settings->frameRate();
-        request.compositor.bubble = BubbleStyle::instance()->snapshot();
-        switch (settings->mode()) {
-        case RecordingSettings::CaptureMode::CameraOnly:
-            request.compositor.layout = CompositeLayout::CameraOnly;
-            break;
-        case RecordingSettings::CaptureMode::ScreenOnly:
-            request.compositor.layout = CompositeLayout::ScreenOnly;
-            break;
-        case RecordingSettings::CaptureMode::ScreenAndCamera:
-            request.compositor.layout =
-                settings->usesCamera() ? CompositeLayout::ScreenWithBubble : CompositeLayout::ScreenOnly;
-            break;
-        }
-        if (DeviceCatalog::instance()->microphoneAllowed()) {
-            request.microphone = DeviceCatalog::findMicrophone(settings->microphoneId());
-        }
-        const QSize size = request.compositor.canvasSize;
-        request.videoBitRate =
-            core::planEncoder(core::PixelSize{size.width(), size.height()}, request.compositor.framesPerSecond)
-                .averageBitRate;
-        request.outputPath = nextOutputPath();
-
-        m_clock.start();
-        m_pausedMs = 0;
-        m_pauseStartedMs = -1;
-        m_elapsedTicker.start();
-        emit elapsedChanged();
-        if (!m_pipeline.start(request)) {
-            finish();  // no-op if failed() already finished us
+        if (m_state == State::Recording && !m_pipeline.isActive()) {
+            startPipelines();
         }
     });
+}
+
+void RecordingController::startPipelines() {
+    const RecordingSettings *settings = RecordingSettings::instance();
+    const CaptureSources *capture = CaptureSources::instance();
+    const int fps = settings->frameRate();
+    auto bitRateFor = [fps](const QSize &size) {
+        return core::planEncoder(core::PixelSize{size.width(), size.height()}, fps).averageBitRate;
+    };
+
+    // Screen + Camera with a working camera -> an editable project with two separate files.
+    m_projectMode = settings->mode() == RecordingSettings::CaptureMode::ScreenAndCamera && settings->usesCamera() &&
+                    capture->cameraActive() && !capture->cameraResolution().isEmpty();
+
+    RecordingPipeline::Request request;
+    request.compositor.canvasSize = capture->outputSize();
+    request.compositor.sourceCrop = capture->sourceCrop();
+    request.compositor.framesPerSecond = fps;
+    request.compositor.bubble = BubbleStyle::instance()->snapshot();
+    request.compositor.layout = settings->mode() == RecordingSettings::CaptureMode::CameraOnly
+                                    ? CompositeLayout::CameraOnly
+                                    : CompositeLayout::ScreenOnly;  // projects add the camera later
+    if (DeviceCatalog::instance()->microphoneAllowed()) {
+        request.microphone = DeviceCatalog::findMicrophone(settings->microphoneId());
+    }
+    request.videoBitRate = bitRateFor(request.compositor.canvasSize);
+
+    if (m_projectMode) {
+        m_project = Project{};
+        m_project.folder = nextProjectFolder();
+        if (!QDir().mkpath(m_project.folder)) {
+            setError(tr("Can't create %1.").arg(m_project.folder));
+            finish();
+            return;
+        }
+        m_project.canvasSize = request.compositor.canvasSize;
+        m_project.framesPerSecond = fps;
+        m_project.createdAt = QDateTime::currentDateTime().toString(Qt::ISODate);
+        // First segment: the current bubble look, placed where the floating bubble was.
+        ProjectSegment first;
+        first.style = BubbleStyle::instance()->snapshot();
+        first.style.center = bubbleCenterInTarget();
+        m_project.segments = {first};
+        request.outputPath = m_project.screenPath();
+    } else {
+        request.outputPath = nextOutputPath();
+    }
+
+    m_pendingPipelines = 0;
+    m_screenSaved = false;
+    m_cameraSaved = false;
+    m_screenClockMs = -1;
+    m_cameraClockMs = -1;
+    m_clock.start();
+    m_pausedMs = 0;
+    m_pauseStartedMs = -1;
+    m_elapsedTicker.start();
+    emit elapsedChanged();
+
+    m_startingPipelines = true;
+    const bool screenStarted = m_pipeline.start(request);
+    if (screenStarted) {
+        m_pendingPipelines++;
+    }
+    if (screenStarted && m_projectMode) {
+        // The camera's full frame, unmirrored: mirroring and cropping happen at export time.
+        const QSize camera = capture->cameraResolution();
+        RecordingPipeline::Request cameraRequest;
+        cameraRequest.compositor.canvasSize = QSize(core::makeEven(camera.width()), core::makeEven(camera.height()));
+        cameraRequest.compositor.layout = CompositeLayout::CameraOnly;
+        cameraRequest.compositor.framesPerSecond = fps;
+        cameraRequest.compositor.bubble.mirrored = false;
+        cameraRequest.videoBitRate = bitRateFor(cameraRequest.compositor.canvasSize);
+        cameraRequest.outputPath = m_project.cameraPath();
+        if (m_cameraPipeline.start(cameraRequest)) {
+            m_pendingPipelines++;
+        } else {
+            m_project.cameraFile.clear();
+        }
+    }
+    m_startingPipelines = false;
+
+    if (!screenStarted) {
+        setError(tr("The recording could not start."));
+        finish();
+    }
+}
+
+void RecordingController::onPipelineDone(bool camera, const QString &error, const QString &path) {
+    if (m_startingPipelines || m_state == State::Idle) {
+        return;  // a request was rejected inside start(): handled by startPipelines()
+    }
+    if (!error.isEmpty()) {
+        setError(error);
+    }
+    if (camera) {
+        m_cameraSaved = error.isEmpty();
+    } else {
+        m_screenSaved = error.isEmpty();
+        m_directPath = path;
+    }
+    if (m_pendingPipelines > 0) {
+        m_pendingPipelines--;
+    }
+    if (m_pendingPipelines > 0) {
+        return;  // wait for the other file
+    }
+
+    if (m_projectMode) {
+        completeProject();
+    } else if (m_screenSaved) {
+        m_lastRecording = m_directPath;
+        emit lastRecordingChanged();
+    }
+    finish();
+}
+
+void RecordingController::completeProject() {
+    if (!m_screenSaved) {
+        return;  // nothing usable was written
+    }
+    if (!m_cameraSaved) {
+        m_project.cameraFile.clear();
+    }
+    m_project.durationMs = m_recordedMs;
+    if (m_screenClockMs >= 0 && m_cameraClockMs >= 0) {
+        m_project.cameraOffsetMs = m_cameraClockMs - m_screenClockMs;
+    }
+    QString error;
+    if (!m_project.save(&error)) {
+        setError(tr("Couldn't save the project: %1").arg(error));
+        return;
+    }
+    m_lastRecording = m_project.folder;
+    emit lastRecordingChanged();
+    emit openProjectRequested(m_project.folder);
 }
 
 void RecordingController::stop() {
@@ -216,9 +313,11 @@ void RecordingController::stop() {
             finish();  // stopped during the hide delay: nothing was written yet
             return;
         }
+        m_recordedMs = activeMilliseconds();
         m_elapsedTicker.stop();
         setState(State::Finalizing);
         m_pipeline.stop();
+        m_cameraPipeline.stop();  // no-op unless recording a project
         break;
     case State::Idle:
     case State::Finalizing:
@@ -229,10 +328,12 @@ void RecordingController::stop() {
 void RecordingController::togglePause() {
     if (m_state == State::Recording && m_pipeline.isActive()) {
         m_pipeline.pause();
+        m_cameraPipeline.pause();
         m_pauseStartedMs = m_clock.elapsed();
         setState(State::Paused);
     } else if (m_state == State::Paused) {
         m_pipeline.resume();
+        m_cameraPipeline.resume();
         m_pausedMs += m_clock.elapsed() - m_pauseStartedMs;
         m_pauseStartedMs = -1;
         setState(State::Recording);
@@ -270,9 +371,14 @@ void RecordingController::finish() {
     emit windowShowRequested();
 }
 
-void RecordingController::openLastRecording() const {
-    if (!m_lastRecording.isEmpty()) {
-        QDesktopServices::openUrl(QUrl::fromLocalFile(m_lastRecording));
+void RecordingController::openLastRecording() {
+    if (m_lastRecording.isEmpty()) {
+        return;
+    }
+    if (QFileInfo(m_lastRecording).isDir()) {
+        emit openProjectRequested(m_lastRecording);  // a project: open it in the editor
+    } else {
+        QDesktopServices::openUrl(QUrl::fromLocalFile(m_lastRecording));  // a finished video: play it
     }
 }
 
@@ -314,6 +420,17 @@ void RecordingController::setError(const QString &message) {
         m_errorString = message;
         emit errorStringChanged();
     }
+}
+
+QString RecordingController::nextProjectFolder() const {
+    const QDir folder(RecordingSettings::instance()->outputFolder());
+    const QString stem = QStringLiteral("ScreenCam %1")
+                             .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd 'at' HH.mm.ss")));
+    QString path = folder.filePath(stem + QStringLiteral(".screencam"));
+    for (int i = 2; QFileInfo::exists(path); i++) {
+        path = folder.filePath(QStringLiteral("%1 (%2).screencam").arg(stem).arg(i));
+    }
+    return path;
 }
 
 QString RecordingController::nextOutputPath() const {
