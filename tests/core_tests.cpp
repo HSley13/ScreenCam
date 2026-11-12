@@ -13,6 +13,7 @@
 #include "core/Resolution.hpp"
 #include "core/TimeFormat.hpp"
 #include "core/Timeline.hpp"
+#include "core/WindowFilter.hpp"
 
 namespace {
 
@@ -240,6 +241,51 @@ void testTimeline() {
     CHECK(insertionIndex(starts, 20000) == 3);
 }
 
+void testWindowFilter() {
+    WindowTraits safari;  // a normal app window
+    safari.width = 1200;
+    safari.height = 800;
+    CHECK(isUserAppWindow(safari));
+
+    WindowTraits menuBar = safari;  // menu bar / status items / Dock live above level 0
+    menuBar.layer = 24;
+    CHECK(!isUserAppWindow(menuBar));
+
+    WindowTraits clock = safari;  // a status item: tiny
+    clock.width = 60;
+    clock.height = 24;
+    CHECK(!isUserAppWindow(clock));
+
+    WindowTraits cpuMeterPopover = safari;  // menu-bar utility (no Dock icon), even if big
+    cpuMeterPopover.regularApp = false;
+    CHECK(!isUserAppWindow(cpuMeterPopover));
+
+    WindowTraits palette = safari;
+    palette.toolWindow = true;
+    CHECK(!isUserAppWindow(palette));
+
+    WindowTraits otherDesktop = safari;
+    otherDesktop.cloaked = true;
+    CHECK(!isUserAppWindow(otherDesktop));
+
+    WindowTraits invisible = safari;
+    invisible.alpha = 0.0;
+    CHECK(!isUserAppWindow(invisible));
+
+    WindowTraits frameless = safari;  // no minimize/maximize: splash screens, overlays
+    frameless.hasWindowControls = false;
+    CHECK(!isUserAppWindow(frameless));
+
+    WindowTraits own = safari;
+    own.ownedBySelf = true;
+    CHECK(!isUserAppWindow(own));
+
+    CHECK(windowLabel("Safari", "GitHub") == "Safari \u2014 GitHub");
+    CHECK(windowLabel("Finder", "") == "Finder");
+    CHECK(windowLabel("Notes", "Notes") == "Notes");
+    CHECK(windowLabel("", "Untitled") == "Untitled");
+}
+
 }  // namespace
 
 int main() {
@@ -258,6 +304,7 @@ int main() {
     testNv12Conversion();
     testAudioLevel();
     testTimeline();
+    testWindowFilter();
 
     if (g_failures == 0) {
         std::cout << "All core tests passed\n";

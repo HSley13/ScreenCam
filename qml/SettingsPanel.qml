@@ -85,7 +85,7 @@ Rectangle {
 
                 Field {
                     label: qsTr("Window")
-                    hint: Capture.windows.length + qsTr(" open")
+                    hint: qsTr("%n app window(s)", "", Capture.windows.length)
                     visible: panel.screenMode && RecordingSettings.captureTarget === RecordingSettings.Window
 
                     RowLayout {
@@ -98,12 +98,25 @@ Rectangle {
                             selectedValue: Capture.selectedWindow
                             displayText: Capture.selectedWindow < 0 ? qsTr("Choose a window…") : currentText
                             onPicked: (value) => Capture.selectedWindow = value
+                            // Apps open and close all the time: re-read the list each time it opens.
+                            onAboutToOpen: Capture.refreshWindows()
                         }
 
                         StyledButton {
                             text: qsTr("Refresh")
                             onClicked: Capture.refreshWindows()
                         }
+                    }
+
+                    Label {
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        color: Theme.textMuted
+                        font.pixelSize: 11
+                        text: Qt.platform.os === "osx"
+                              ? qsTr("Only app windows are listed — not the menu bar, its icons or the Dock. "
+                                     + "Minimized windows and windows on other desktops appear once they're on screen.")
+                              : qsTr("Only app windows are listed — not the taskbar, panels or tray icons.")
                     }
                 }
 

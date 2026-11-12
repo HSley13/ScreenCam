@@ -1,5 +1,6 @@
 #include "app/CaptureSources.hpp"
 
+#include "app/AppWindows.hpp"
 #include "app/DeviceCatalog.hpp"
 #include "app/RecordingSettings.hpp"
 #include "core/CameraLayout.hpp"
@@ -12,11 +13,29 @@
 #include <QJSEngine>
 #include <QScreen>
 
+#include <algorithm>
+
+#ifdef SCREENCAM_HAS_WINDOW_IDS
+#include <QtMultimedia/private/qcapturablewindow_p.h>
+#endif
+
 namespace core = screencam::core;
 
 namespace {
 
 constexpr int kScreenWatchdogMs = 4000;
+
+/// The OS's id of a window Qt can capture (CGWindowID / HWND / X11 Window), or 0 if this Qt
+/// doesn't let us see it. Qt keeps it in the private part of QCapturableWindow.
+quintptr nativeWindowId(const QCapturableWindow &window) {
+#ifdef SCREENCAM_HAS_WINDOW_IDS
+    const QCapturableWindowPrivate *data = QCapturableWindowPrivate::handle(window);
+    return data != nullptr ? static_cast<quintptr>(data->id) : 0;
+#else
+    Q_UNUSED(window);
+    return 0;
+#endif
+}
 
 QString noScreenPictureMessage() {
     return QCoreApplication::translate(
@@ -271,29 +290,69 @@ void CaptureSources::updateScreen() {
 QVariantList CaptureSources::windows() const {
     QVariantList list;
     for (int i = 0; i < m_windows.size(); i++) {
-        const QString title = m_windows.at(i).description();
-        list.append(QVariantMap{{QStringLiteral("id"), i},
-                                {QStringLiteral("name"), title.isEmpty() ? tr("Untitled window") : title}});
+        list.append(QVariantMap{{QStringLiteral("id"), i}, {QStringLiteral("name"), m_windowLabels.at(i)}});
     }
     return list;
 }
 
 void CaptureSources::refreshWindows() {
-    const QString previous =
-        (m_selectedWindow >= 0 && m_selectedWindow < m_windows.size()) ? m_windows.at(m_selectedWindow).description()
-                                                                        : QString();
-    m_windows.clear();
+    const bool hadSelection = m_selectedWindow >= 0 && m_selectedWindow < m_windows.size();
+    const quintptr previousId = hadSelection ? m_windowIds.at(m_selectedWindow) : 0;
+    const QString previousLabel = hadSelection ? m_windowLabels.at(m_selectedWindow) : QString();
+
+    // Qt's list = everything the OS calls a window (menu bar, clock, battery ...). Keep the
+    // ones the OS's own list says are real app windows; match the two by native id.
+    bool detailsAvailable = false;
+    QHash<quintptr, AppWindow> appWindows;
+#ifdef SCREENCAM_HAS_WINDOW_IDS
+    appWindows = listAppWindows(&detailsAvailable);
+#endif
+
+    struct Entry {
+        QCapturableWindow window;
+        quintptr id = 0;
+        QString label;
+    };
+    QList<Entry> entries;
     for (const QCapturableWindow &window : QWindowCapture::capturableWindows()) {
-        // ScreenCam's own windows (control panel, bubble, ...) are never what you want to record.
-        if (window.isValid() && !window.description().startsWith(QCoreApplication::applicationName())) {
-            m_windows.append(window);
+        if (!window.isValid()) {
+            continue;
+        }
+        const quintptr id = nativeWindowId(window);
+        if (detailsAvailable) {
+            const auto found = appWindows.constFind(id);
+            if (found == appWindows.constEnd()) {
+                continue;  // not an app window
+            }
+            entries.append({window, id, found->label});
+        } else {
+            // Fallback without OS details: at least drop untitled windows and our own.
+            const QString title = window.description();
+            if (title.isEmpty() || title.startsWith(QCoreApplication::applicationName())) {
+                continue;
+            }
+            entries.append({window, id, title});
         }
     }
+    // Alphabetical, so all of an app's windows sit together ("Safari — A", "Safari — B").
+    std::sort(entries.begin(), entries.end(), [](const Entry &a, const Entry &b) {
+        return QString::localeAwareCompare(a.label, b.label) < 0;
+    });
+
+    m_windows.clear();
+    m_windowLabels.clear();
+    m_windowIds.clear();
     m_selectedWindow = -1;
-    for (int i = 0; i < m_windows.size(); i++) {
-        if (!previous.isEmpty() && m_windows.at(i).description() == previous) {
-            m_selectedWindow = i;
+    for (const Entry &entry : entries) {
+        // Keep the choice: same window id, or (without ids) the same label.
+        const bool same = previousId != 0 ? entry.id == previousId
+                                          : (!previousLabel.isEmpty() && entry.label == previousLabel);
+        if (same && m_selectedWindow < 0) {
+            m_selectedWindow = static_cast<int>(m_windows.size());
         }
+        m_windows.append(entry.window);
+        m_windowLabels.append(entry.label);
+        m_windowIds.append(entry.id);
     }
     emit windowsChanged();
     updateScreen();
