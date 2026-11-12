@@ -51,14 +51,73 @@ Rectangle {
                 title: qsTr("Sources")
 
                 Field {
-                    label: qsTr("Screen")
+                    label: qsTr("Record")
                     visible: panel.screenMode
+
+                    SegmentedControl {
+                        Layout.fillWidth: true
+                        options: [
+                            { value: RecordingSettings.Screen, label: qsTr("Entire screen") },
+                            { value: RecordingSettings.Window, label: qsTr("Window") },
+                            { value: RecordingSettings.Region, label: qsTr("Region") }
+                        ]
+                        value: RecordingSettings.captureTarget
+                        onActivated: (value) => {
+                            RecordingSettings.captureTarget = value;
+                            if (value === RecordingSettings.Window) {
+                                Capture.refreshWindows();
+                            }
+                        }
+                    }
+                }
+
+                Field {
+                    label: qsTr("Screen")
+                    visible: panel.screenMode && RecordingSettings.captureTarget !== RecordingSettings.Window
 
                     StyledComboBox {
                         Layout.fillWidth: true
                         model: Devices.screens
                         selectedValue: RecordingSettings.screenId
                         onPicked: (value) => RecordingSettings.screenId = value
+                    }
+                }
+
+                Field {
+                    label: qsTr("Window")
+                    hint: Capture.windows.length + qsTr(" open")
+                    visible: panel.screenMode && RecordingSettings.captureTarget === RecordingSettings.Window
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        StyledComboBox {
+                            Layout.fillWidth: true
+                            model: Capture.windows
+                            selectedValue: Capture.selectedWindow
+                            displayText: Capture.selectedWindow < 0 ? qsTr("Choose a window…") : currentText
+                            onPicked: (value) => Capture.selectedWindow = value
+                        }
+
+                        StyledButton {
+                            text: qsTr("Refresh")
+                            onClicked: Capture.refreshWindows()
+                        }
+                    }
+                }
+
+                Field {
+                    label: qsTr("Area")
+                    hint: RecordingSettings.region.width > 0
+                          ? Capture.screenSize.width + " × " + Capture.screenSize.height + " px" : qsTr("none yet")
+                    visible: panel.screenMode && RecordingSettings.captureTarget === RecordingSettings.Region
+
+                    StyledButton {
+                        Layout.fillWidth: true
+                        accent: RecordingSettings.region.width === 0
+                        text: RecordingSettings.region.width > 0 ? qsTr("Select a different area…") : qsTr("Select area…")
+                        onClicked: panel.selectRegion()
                     }
                 }
 
@@ -209,6 +268,32 @@ Rectangle {
                     }
                 }
             }
+        }
+    }
+
+    // Opens the region selector on the chosen screen.
+    function selectRegion() {
+        const screens = Devices.screens;
+        let entry = screens.length > 0 ? screens[0] : null;
+        for (let i = 0; i < screens.length; i++) {
+            if (screens[i].id === RecordingSettings.screenId) {
+                entry = screens[i];
+            }
+        }
+        if (entry === null) {
+            return;
+        }
+        regionSelectorComponent.createObject(null, {
+            screenId: entry.id,
+            screenGeometry: entry.geometry,
+            pixelRatio: entry.pixelRatio
+        }).show();
+    }
+
+    Component {
+        id: regionSelectorComponent
+        RegionSelector {
+            onClosing: destroy()
         }
     }
 
