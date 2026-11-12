@@ -23,6 +23,19 @@ built with CMake. Runs on **macOS, Windows and Linux** from the same code.
 
 ## Build and install
 
+### CMake presets
+
+| Command | What it does |
+| --- | --- |
+| `cmake --preset default` / `cmake --build --preset default` | Debug build in `build/` (clangd reads `build/compile_commands.json`) |
+| `ctest --preset default` | run all tests (headless) |
+| `cmake --workflow --preset default` | configure + build + test in one go |
+| `cmake --workflow --preset release` | Release in `build/release/`: configure + build + test + package |
+
+Qt is found through `CMAKE_PREFIX_PATH` — export it in your shell (e.g.
+`export CMAKE_PREFIX_PATH=$HOME/Qt/6.10.1/macos`) or pass `-DCMAKE_PREFIX_PATH=…` once when
+configuring. Presets need CMake ≥ 3.25.
+
 Requirements: **Qt 6.8 or newer** with **Qt Multimedia and its FFmpeg backend**, **CMake ≥ 3.24**,
 **Ninja**, and a C++20 compiler.
 
@@ -103,7 +116,7 @@ platforms on every push to `main` — download them from the run's *Artifacts*.
 ### Tests
 
 ```bash
-cmake --preset dev && cmake --build --preset dev && ctest --preset dev
+cmake --workflow --preset default        # configure + build + test (Debug, in build/)
 ```
 
 | Test | What it proves |
@@ -113,7 +126,7 @@ cmake --preset dev && cmake --build --preset dev && ctest --preset dev
 | `tst_pipeline` | a real MP4 is written: duration excludes the pause, 640×360, decoded colours correct |
 | `ui_smoke` | the whole QML UI loads headless with **zero** QML warnings (`ScreenCam --self-test`) |
 
-clangd (Neovim) reads `build/<preset>/compile_commands.json`; `.clang-format` matches the style.
+clangd (Neovim) picks up `build/compile_commands.json` from the `default` preset; `.clang-format` matches the style.
 
 ---
 
