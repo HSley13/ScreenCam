@@ -91,9 +91,12 @@ build_qtmultimedia() {
     cd "$build"
     # FFMPEG_DIR / QT_DEPLOY_FFMPEG are what configure's -ffmpeg-dir / -ffmpeg-deploy set.
     # Deploying copies the FFmpeg libraries into Qt's own lib directory.
+    # QT_NO_APPLE_SDK_AND_XCODE_CHECK: Qt's build otherwise runs `xcodebuild -version`, which
+    # fails with only the Command Line Tools installed; the check is informational only.
     "$QT_DIR/bin/qt-configure-module" "$WORK_DIR/qtmultimedia-src" -- \
         -DFFMPEG_DIR="$FFMPEG_PREFIX" \
-        -DQT_DEPLOY_FFMPEG=TRUE
+        -DQT_DEPLOY_FFMPEG=TRUE \
+        -DQT_NO_APPLE_SDK_AND_XCODE_CHECK=ON
     step "config.summary (FFmpeg lines)"
     grep -i ffmpeg config.summary || true
     grep -iE "ffmpeg[ .]*yes" config.summary >/dev/null ||
