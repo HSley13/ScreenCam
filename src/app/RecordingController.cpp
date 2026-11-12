@@ -192,7 +192,7 @@ void RecordingController::beginRecording() {
         m_elapsedTicker.start();
         emit elapsedChanged();
         if (!m_pipeline.start(request)) {
-            finish();  // failed() already set the error
+            finish();  // no-op if failed() already finished us
         }
     });
 }
@@ -252,6 +252,9 @@ void RecordingController::cancelCountdown() {
 }
 
 void RecordingController::finish() {
+    if (m_state == State::Idle) {
+        return;  // already finished (e.g. failed() fired synchronously inside start())
+    }
     m_countdownTimer.stop();
     m_elapsedTicker.stop();
     CaptureSources::instance()->setRecordingActive(false);
