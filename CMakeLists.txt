@@ -28,6 +28,7 @@ endif()
 # Portable core: plain C++20, no Qt -> geometry, sizes, pixel conversion.
 # ---------------------------------------------------------------------------
 add_library(screencam_core STATIC
+    src/core/AudioLevel.cpp
     src/core/BubbleGeometry.cpp
     src/core/CameraLayout.cpp
     src/core/EncoderPlan.cpp
@@ -53,10 +54,21 @@ if(SCREENCAM_BUILD_APP)
     qt_standard_project_setup(REQUIRES 6.8)
 
     set(SCREENCAM_APP_SOURCES
+        src/app/AudioLevelMeter.cpp src/app/AudioLevelMeter.hpp
+        src/app/DeviceCatalog.cpp src/app/DeviceCatalog.hpp
+        src/app/RecordingSettings.cpp src/app/RecordingSettings.hpp
     )
     set(SCREENCAM_QML_FILES
         qml/Main.qml
+        qml/SettingsPanel.qml
         qml/Theme.qml
+        qml/components/Field.qml
+        qml/components/LevelMeter.qml
+        qml/components/SegmentedControl.qml
+        qml/components/SidebarSection.qml
+        qml/components/StyledButton.qml
+        qml/components/StyledComboBox.qml
+        qml/components/StyledSwitch.qml
     )
     set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
@@ -70,7 +82,8 @@ if(SCREENCAM_BUILD_APP)
         QML_FILES ${SCREENCAM_QML_FILES}
         SOURCES ${SCREENCAM_APP_SOURCES}
     )
-    target_include_directories(ScreenCam PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    # src/app too: the generated QML type registrations include the headers by file name.
+    target_include_directories(ScreenCam PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/src/app)
     target_compile_definitions(ScreenCam PRIVATE SCREENCAM_VERSION="${PROJECT_VERSION}")
     target_link_libraries(ScreenCam PRIVATE
         screencam_core

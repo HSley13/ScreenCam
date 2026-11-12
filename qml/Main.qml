@@ -13,6 +13,9 @@ ApplicationWindow {
     title: qsTr("ScreenCam")
     color: Theme.window
 
+    // macOS asks for camera/microphone access the first time; elsewhere this is a no-op.
+    Component.onCompleted: Devices.requestPermissions()
+
     RowLayout {
         anchors.fill: parent
         anchors.margins: 16
@@ -34,13 +37,9 @@ ApplicationWindow {
             }
         }
 
-        // Settings sidebar (filled in by the device and bubble features).
-        Rectangle {
+        SettingsPanel {
             Layout.preferredWidth: Theme.sidebarWidth
             Layout.fillHeight: true
-            radius: Theme.radius
-            color: Theme.surface
-            border.color: Theme.stroke
         }
     }
 }

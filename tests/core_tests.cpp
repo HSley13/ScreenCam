@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "core/AudioLevel.hpp"
 #include "core/BubbleGeometry.hpp"
 #include "core/CameraLayout.hpp"
 #include "core/Nv12.hpp"
@@ -197,6 +198,15 @@ void testNv12Conversion() {
     CHECK(uvPlane[2] == blue.u && uvPlane[3] == blue.v);
 }
 
+void testAudioLevel() {
+    CHECK(near(peakToMeterLevel(0.0), 0.0));
+    CHECK(near(peakToMeterLevel(1.0), 1.0));
+    CHECK(near(peakToMeterLevel(0.1), 2.0 / 3.0));  // -20 dBFS
+    CHECK(near(peakToMeterLevel(0.0001), 0.0));     // -80 dBFS is below the floor
+    CHECK(near(smoothMeterLevel(0.8, 0.2, 0.25), 0.6));  // decays from 0.8
+    CHECK(near(smoothMeterLevel(0.3, 0.9, 0.25), 0.9));  // jumps up immediately
+}
+
 }  // namespace
 
 int main() {
@@ -212,6 +222,7 @@ int main() {
     testAspectFillCrop();
     testYuvColours();
     testNv12Conversion();
+    testAudioLevel();
 
     if (g_failures == 0) {
         std::cout << "All core tests passed\n";
