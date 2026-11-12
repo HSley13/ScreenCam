@@ -18,6 +18,7 @@ RecordingPipeline::RecordingPipeline(QObject *parent)
 
     // Different threads -> queued: frames arrive here on the main thread.
     connect(m_compositor, &FrameCompositor::frameReady, this, &RecordingPipeline::sendFrame);
+    connect(m_compositor, &FrameCompositor::clockStarted, this, &RecordingPipeline::clockStarted);
     connect(&m_recorder, &QMediaRecorder::recorderStateChanged, this, &RecordingPipeline::onRecorderStateChanged);
     connect(&m_recorder, &QMediaRecorder::errorOccurred, this, [this](QMediaRecorder::Error, const QString &message) {
         m_error = message.isEmpty() ? tr("The recording failed.") : message;

@@ -56,6 +56,8 @@ public:
     void updateBubble(const BubbleStyleSnapshot &bubble);
 
 signals:
+    /// Video time 0 on the monotonic clock (see FrameCompositor::clockStarted).
+    void clockStarted(qint64 referenceMs);
     void finished(const QString &path);
     void failed(const QString &message);
 

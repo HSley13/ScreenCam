@@ -35,6 +35,7 @@ add_library(screencam_core STATIC
     src/core/Nv12.cpp
     src/core/Resolution.cpp
     src/core/TimeFormat.cpp
+    src/core/Timeline.cpp
 )
 target_include_directories(screencam_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_options(screencam_core PRIVATE ${SCREENCAM_WARNINGS})
@@ -69,6 +70,7 @@ if(SCREENCAM_BUILD_APP)
         src/media/BubbleStyleSnapshot.cpp src/media/BubbleStyleSnapshot.hpp
         src/media/FrameCompositor.cpp src/media/FrameCompositor.hpp
         src/media/MediaBackendCheck.cpp src/media/MediaBackendCheck.hpp
+        src/media/Project.cpp src/media/Project.hpp
         src/media/RecordingPipeline.cpp src/media/RecordingPipeline.hpp
     )
     target_include_directories(screencam_media PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -87,6 +89,7 @@ if(SCREENCAM_BUILD_APP)
         screencam_add_qt_test(tst_compositor)
         screencam_add_qt_test(tst_pipeline)
         screencam_add_qt_test(tst_media_backend)
+        screencam_add_qt_test(tst_project)
     endif()
 
     set(SCREENCAM_APP_SOURCES

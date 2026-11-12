@@ -64,18 +64,22 @@ private slots:
         QTest::qWait(700);
         pipeline.stop();
 
-        QVERIFY2(finished.wait(15000) || !finished.isEmpty(),
-                 failed.isEmpty() ? "no result" : qPrintable(failed.first().first().toString()));
+        QTRY_VERIFY_WITH_TIMEOUT(!finished.isEmpty() || !failed.isEmpty(), 15000);
+        QVERIFY2(failed.isEmpty(), failed.isEmpty() ? "" : qPrintable(failed.first().first().toString()));
         QCOMPARE(failed.count(), 0);
         QVERIFY(QFileInfo(path).size() > 0);
         qInfo() << "recorded" << path << "dropped frames:" << pipeline.droppedFrames();
 
         // --- Inspect the file ---------------------------------------------------------
-        QMediaPlayer player;
+        // The sink must outlive the player (declared first = destroyed last): the player's
+        // decoding thread may still push a frame into it while being torn down.
         QVideoSink sink;
+        QMediaPlayer player;
         player.setVideoSink(&sink);
         QVideoFrame firstFrame;
-        connect(&sink, &QVideoSink::videoFrameChanged, this, [&firstFrame](const QVideoFrame &frame) {
+        // Context = the sink (not `this`): frames are queued from the decoder thread, and queued
+        // calls are only dropped when the *context* dies — `this` outlives `firstFrame`.
+        connect(&sink, &QVideoSink::videoFrameChanged, &sink, [&firstFrame](const QVideoFrame &frame) {
             if (!firstFrame.isValid() && frame.isValid()) {
                 firstFrame = frame;
             }
@@ -92,12 +96,52 @@ private slots:
         player.play();
         QTRY_VERIFY_WITH_TIMEOUT(firstFrame.isValid(), 10000);
         player.stop();
+        player.setVideoSink(nullptr);
         const QImage image = firstFrame.toImage();
         QCOMPARE(image.size(), QSize(640, 360));
         QVERIFY2(roughly(image.pixelColor(320, 180), QColor(40, 200, 40)),
                  qPrintable(image.pixelColor(320, 180).name()));  // bubble centre: camera
         QVERIFY2(roughly(image.pixelColor(30, 30), QColor(200, 40, 40)),
                  qPrintable(image.pixelColor(30, 30).name()));    // corner: screen
+    }
+
+    void recordsTwoFilesInParallelWithAlignedClocks() {
+        // What a project recording does: screen and camera into separate files at once.
+        QTemporaryDir dir;
+        RecordingPipeline screen;
+        RecordingPipeline camera;
+        QSignalSpy screenDone(&screen, &RecordingPipeline::finished);
+        QSignalSpy cameraDone(&camera, &RecordingPipeline::finished);
+        QSignalSpy screenClock(&screen, &RecordingPipeline::clockStarted);
+        QSignalSpy cameraClock(&camera, &RecordingPipeline::clockStarted);
+
+        RecordingPipeline::Request screenRequest;
+        screenRequest.outputPath = dir.filePath("screen.mp4");
+        screenRequest.compositor.canvasSize = QSize(640, 360);
+        screenRequest.compositor.layout = CompositeLayout::ScreenOnly;
+        RecordingPipeline::Request cameraRequest;
+        cameraRequest.outputPath = dir.filePath("camera.mp4");
+        cameraRequest.compositor.canvasSize = QSize(320, 240);
+        cameraRequest.compositor.layout = CompositeLayout::CameraOnly;
+        cameraRequest.compositor.bubble.mirrored = false;
+
+        screen.pushScreenImage(solid(QSize(640, 360), Qt::red));
+        camera.pushCameraImage(solid(QSize(320, 240), Qt::green));
+        QVERIFY(screen.start(screenRequest));
+        QVERIFY(camera.start(cameraRequest));
+        QTest::qWait(800);
+        screen.stop();
+        camera.stop();
+
+        QTRY_VERIFY_WITH_TIMEOUT(!screenDone.isEmpty(), 15000);
+        QTRY_VERIFY_WITH_TIMEOUT(!cameraDone.isEmpty(), 15000);
+        QCOMPARE(screenClock.count(), 1);
+        QCOMPARE(cameraClock.count(), 1);
+        const qint64 offset = cameraClock.first().first().toLongLong() - screenClock.first().first().toLongLong();
+        qInfo() << "camera clock offset (ms):" << offset;
+        QVERIFY2(offset >= 0 && offset < 500, qPrintable(QString::number(offset)));
+        QVERIFY(QFileInfo(dir.filePath("screen.mp4")).size() > 0);
+        QVERIFY(QFileInfo(dir.filePath("camera.mp4")).size() > 0);
     }
 
     void rejectsAnEmptyCanvas() {
