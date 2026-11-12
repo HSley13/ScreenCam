@@ -96,6 +96,8 @@ if(SCREENCAM_BUILD_APP)
         target_link_libraries(screencam_export PUBLIC
             screencam_media FFmpeg::avformat FFmpeg::avcodec FFmpeg::swscale FFmpeg::avutil)
         target_compile_options(screencam_export PRIVATE ${SCREENCAM_WARNINGS})
+        # Whoever links the exporter (the app, tests) gets the define that turns export on.
+        target_compile_definitions(screencam_export PUBLIC SCREENCAM_HAS_EXPORT)
         message(STATUS "Video export: ON (FFmpeg ${FFmpeg_VERSION} in ${FFmpeg_INCLUDE_DIR})")
     else()
         message(STATUS "Video export: OFF - FFmpeg development files not found. "
@@ -209,6 +211,9 @@ if(SCREENCAM_BUILD_APP)
     # src/app too: the generated QML type registrations include the headers by file name.
     target_include_directories(ScreenCam PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/src/app)
     target_compile_definitions(ScreenCam PRIVATE SCREENCAM_VERSION="${PROJECT_VERSION}")
+    if(SCREENCAM_HAS_EXPORT)
+        target_link_libraries(ScreenCam PRIVATE screencam_export)
+    endif()
     target_link_libraries(ScreenCam PRIVATE
         screencam_media
         Qt6::Widgets
@@ -273,7 +278,12 @@ if(SCREENCAM_BUILD_APP)
         target_include_directories(tst_project_editor PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         target_link_libraries(tst_project_editor PRIVATE screencam_media Qt6::Qml Qt6::Test)
         add_test(NAME tst_project_editor COMMAND tst_project_editor)
-        set_tests_properties(tst_project_editor PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+        set_tests_properties(tst_project_editor PROPERTIES
+            ENVIRONMENT "QT_QPA_PLATFORM=offscreen;SCREENCAM_SAMPLE_PROJECT=${SCREENCAM_SAMPLE_PROJECT}")
+        if(SCREENCAM_HAS_EXPORT)
+            target_link_libraries(tst_project_editor PRIVATE screencam_export)
+            set_tests_properties(tst_project_editor PROPERTIES FIXTURES_REQUIRED sample_project)
+        endif()
 
         # Editor smoke test: opens the sample project (see make_sample_project above).
         add_test(NAME ui_smoke_editor COMMAND ScreenCam --self-test --open ${SCREENCAM_SAMPLE_PROJECT})

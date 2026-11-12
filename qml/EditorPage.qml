@@ -23,8 +23,12 @@ Item {
     // reports positions once it has decoded the frame, which lags behind the mouse).
     property real playheadMs: 0
 
+    // File name of the export that just finished, for the status line.
+    property string exportedName: ""
+
     ProjectEditor {
         id: project
+        onExportFinished: (path) => page.exportedName = path.substring(path.lastIndexOf("/") + 1)
     }
 
     Component.onCompleted: project.open(page.folder)
@@ -202,8 +206,18 @@ Item {
             }
 
             Label {
-                text: project.errorText.length > 0 ? project.errorText
-                                                  : (project.dirty ? qsTr("Saving…") : qsTr("All changes saved"))
+                text: {
+                    if (project.errorText.length > 0) {
+                        return project.errorText;
+                    }
+                    if (project.exporting) {
+                        return qsTr("Exporting…  you can keep editing; changes go into the next export");
+                    }
+                    if (page.exportedName.length > 0) {
+                        return qsTr("Exported “%1”").arg(page.exportedName);
+                    }
+                    return project.dirty ? qsTr("Saving…") : qsTr("All changes saved");
+                }
                 color: project.errorText.length > 0 ? Theme.record : Theme.textMuted
                 font.pixelSize: 12
                 Layout.fillWidth: true
@@ -214,6 +228,57 @@ Item {
                 text: qsTr("Show in folder")
                 enabled: project.loaded
                 onClicked: project.showInFileManager()
+            }
+
+            StyledButton {
+                visible: project.lastExport.length > 0 && !project.exporting
+                text: qsTr("Play video")
+                onClicked: project.playLastExport()
+            }
+
+            // Export progress: bar + percentage + cancel, in place of the export button.
+            RowLayout {
+                visible: project.exporting
+                spacing: 10
+
+                Rectangle {
+                    implicitWidth: 160
+                    implicitHeight: 6
+                    radius: 3
+                    color: "#2a2f3f"
+
+                    Rectangle {
+                        width: parent.width * project.exportProgress
+                        height: parent.height
+                        radius: 3
+                        color: Theme.accent
+                        Behavior on width { NumberAnimation { duration: Theme.animationFast } }
+                    }
+                }
+
+                Label {
+                    text: Math.round(project.exportProgress * 100) + "%"
+                    color: Theme.text
+                    font.pixelSize: 12
+                    font.features: { "tnum": 1 }
+                    Layout.preferredWidth: 34
+                }
+
+                StyledButton {
+                    text: qsTr("Cancel")
+                    onClicked: project.cancelExport()
+                }
+            }
+
+            StyledButton {
+                visible: !project.exporting
+                enabled: project.loaded
+                accent: true
+                text: project.lastExport.length > 0 ? qsTr("Export again") : qsTr("Export video")
+                onClicked: {
+                    page.exportedName = "";
+                    project.exportVideo();
+                }
             }
         }
 
