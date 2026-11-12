@@ -8,11 +8,16 @@ import QtQuick.Layouts
 SidebarSection {
     id: section
 
-    readonly property bool bubbleMode: RecordingSettings.mode === RecordingSettings.ScreenAndCamera
-    readonly property bool cameraOnly: RecordingSettings.mode === RecordingSettings.CameraOnly
+    // The style being edited: the app-wide default, or the editor's current segment.
+    property var bubbleStyle: BubbleStyle
+    // In the editor: always show the bubble controls, never the Camera-only ones.
+    property bool editorMode: false
 
-    title: qsTr("Camera")
-    visible: (bubbleMode || cameraOnly) && RecordingSettings.cameraId.length > 0
+    readonly property bool bubbleMode: editorMode || RecordingSettings.mode === RecordingSettings.ScreenAndCamera
+    readonly property bool cameraOnly: !editorMode && RecordingSettings.mode === RecordingSettings.CameraOnly
+
+    title: editorMode ? qsTr("This segment") : qsTr("Camera")
+    visible: editorMode || ((bubbleMode || cameraOnly) && RecordingSettings.cameraId.length > 0)
 
     // --- Camera-only mode -------------------------------------------------------------
     Field {
@@ -37,44 +42,44 @@ SidebarSection {
 
         ShapePicker {
             Layout.fillWidth: true
-            shape: BubbleStyle.shape
-            onPicked: (shape) => BubbleStyle.shape = shape
+            shape: section.bubbleStyle.shape
+            onPicked: (shape) => section.bubbleStyle.shape = shape
         }
     }
 
     Field {
         label: qsTr("Size")
-        hint: Math.round(BubbleStyle.size * 100) + "%"
+        hint: Math.round(section.bubbleStyle.size * 100) + "%"
         visible: section.bubbleMode
 
         StyledSlider {
             Layout.fillWidth: true
             from: 0.08
             to: 0.6
-            value: BubbleStyle.size
-            onMoved: BubbleStyle.size = value
+            value: section.bubbleStyle.size
+            onMoved: section.bubbleStyle.size = value
         }
     }
 
     Field {
         label: qsTr("Corner roundness")
-        hint: Math.round(BubbleStyle.roundness * 100) + "%"
+        hint: Math.round(section.bubbleStyle.roundness * 100) + "%"
         visible: section.bubbleMode
-        enabled: BubbleStyle.shape !== BubbleStyle.Circle
+        enabled: section.bubbleStyle.shape !== BubbleStyle.Circle
         opacity: enabled ? 1.0 : 0.4
 
         StyledSlider {
             Layout.fillWidth: true
             from: 0.0
             to: 1.0
-            value: BubbleStyle.roundness
-            onMoved: BubbleStyle.roundness = value
+            value: section.bubbleStyle.roundness
+            onMoved: section.bubbleStyle.roundness = value
         }
     }
 
     Field {
         label: qsTr("Border")
-        hint: BubbleStyle.borderWidth < 0.5 ? qsTr("off") : Math.round(BubbleStyle.borderWidth) + " px"
+        hint: section.bubbleStyle.borderWidth < 0.5 ? qsTr("off") : Math.round(section.bubbleStyle.borderWidth) + " px"
         visible: section.bubbleMode
 
         StyledSlider {
@@ -82,8 +87,8 @@ SidebarSection {
             from: 0
             to: 16
             stepSize: 1
-            value: BubbleStyle.borderWidth
-            onMoved: BubbleStyle.borderWidth = value
+            value: section.bubbleStyle.borderWidth
+            onMoved: section.bubbleStyle.borderWidth = value
         }
 
         RowLayout {
@@ -97,7 +102,7 @@ SidebarSection {
                     id: swatch
 
                     required property string modelData
-                    readonly property bool selected: Qt.colorEqual(BubbleStyle.borderColor, modelData)
+                    readonly property bool selected: Qt.colorEqual(section.bubbleStyle.borderColor, modelData)
 
                     width: 24
                     height: 24
@@ -109,7 +114,7 @@ SidebarSection {
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: BubbleStyle.borderColor = swatch.modelData
+                        onClicked: section.bubbleStyle.borderColor = swatch.modelData
                     }
                 }
             }
@@ -120,14 +125,14 @@ SidebarSection {
         Layout.fillWidth: true
         visible: section.bubbleMode
         text: qsTr("Drop shadow")
-        checked: BubbleStyle.shadow
-        onToggled: BubbleStyle.shadow = checked
+        checked: section.bubbleStyle.shadow
+        onToggled: section.bubbleStyle.shadow = checked
     }
 
     StyledSwitch {
         Layout.fillWidth: true
         text: qsTr("Mirror camera")
-        checked: BubbleStyle.mirrored
-        onToggled: BubbleStyle.mirrored = checked
+        checked: section.bubbleStyle.mirrored
+        onToggled: section.bubbleStyle.mirrored = checked
     }
 }

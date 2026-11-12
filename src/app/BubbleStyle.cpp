@@ -9,7 +9,7 @@
 namespace core = screencam::core;
 
 BubbleStyle *BubbleStyle::instance() {
-    static BubbleStyle *style = new BubbleStyle(qApp);
+    static BubbleStyle *style = new BubbleStyle(qApp, true);
     return style;
 }
 
@@ -19,8 +19,12 @@ BubbleStyle *BubbleStyle::create(QQmlEngine *, QJSEngine *) {
     return style;
 }
 
-BubbleStyle::BubbleStyle(QObject *parent)
-    : QObject(parent) {
+BubbleStyle::BubbleStyle(QObject *parent, bool persistent)
+    : QObject(parent)
+    , m_persistent(persistent) {
+    if (!m_persistent) {
+        return;  // defaults; the owner sets a snapshot
+    }
     m_store.beginGroup(QStringLiteral("bubble"));
     m_style.shape = static_cast<core::BubbleShape>(m_store.value("shape", static_cast<int>(m_style.shape)).toInt());
     m_style.size = m_store.value("size", m_style.size).toDouble();
@@ -33,7 +37,17 @@ BubbleStyle::BubbleStyle(QObject *parent)
     m_style.center.y = m_store.value("centerY", m_style.center.y).toDouble();
 }
 
+void BubbleStyle::setSnapshot(const BubbleStyleSnapshot &style) {
+    m_style = style;
+    commit();
+}
+
 void BubbleStyle::commit() {
+    if (!m_persistent) {
+        m_revision++;
+        emit styleChanged();
+        return;
+    }
     m_store.setValue("shape", static_cast<int>(m_style.shape));
     m_store.setValue("size", m_style.size);
     m_store.setValue("roundness", m_style.roundness);
