@@ -57,6 +57,7 @@ if(SCREENCAM_BUILD_APP)
     add_library(screencam_media STATIC
         src/media/BubbleStyleSnapshot.cpp src/media/BubbleStyleSnapshot.hpp
         src/media/FrameCompositor.cpp src/media/FrameCompositor.hpp
+        src/media/RecordingPipeline.cpp src/media/RecordingPipeline.hpp
     )
     target_include_directories(screencam_media PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(screencam_media PUBLIC screencam_core Qt6::Gui Qt6::Multimedia)
