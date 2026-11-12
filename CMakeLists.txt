@@ -31,6 +31,7 @@ add_library(screencam_core STATIC
     src/core/BubbleGeometry.cpp
     src/core/CameraLayout.cpp
     src/core/EncoderPlan.cpp
+    src/core/Nv12.cpp
     src/core/Resolution.cpp
     src/core/TimeFormat.cpp
 )
