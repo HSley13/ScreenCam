@@ -96,6 +96,7 @@ if(SCREENCAM_BUILD_APP)
         src/app/DeviceCatalog.cpp src/app/DeviceCatalog.hpp
         src/app/RecordingController.cpp src/app/RecordingController.hpp
         src/app/RecordingSettings.cpp src/app/RecordingSettings.hpp
+        src/app/WindowTools.cpp src/app/WindowTools.hpp
     )
     set(SCREENCAM_QML_FILES
         qml/BubbleSection.qml
@@ -130,7 +131,15 @@ if(SCREENCAM_BUILD_APP)
         set(SCREENCAM_PLATFORM_FILES ${CMAKE_CURRENT_SOURCE_DIR}/packaging/windows/ScreenCam.rc)
     endif()
 
+    if(APPLE)
+        enable_language(OBJCXX)  # WindowTools_mac.mm talks to NSWindow
+        list(APPEND SCREENCAM_PLATFORM_FILES src/app/WindowTools_mac.mm)
+    endif()
+
     qt_add_executable(ScreenCam WIN32 MACOSX_BUNDLE src/app/main.cpp ${SCREENCAM_PLATFORM_FILES})
+    if(APPLE)
+        target_link_libraries(ScreenCam PRIVATE "-framework AppKit")
+    endif()
     qt_add_qml_module(ScreenCam
         URI ScreenCam
         VERSION 1.0
