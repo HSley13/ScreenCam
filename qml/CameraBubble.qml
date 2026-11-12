@@ -13,19 +13,16 @@ Item {
     // Size of the preview canvas this bubble lives on (in item pixels).
     property size canvasSize: Qt.size(1, 1)
 
-    // `BubbleStyle.revision` is read so the binding re-runs whenever any style value changes.
-    readonly property rect area: {
-        BubbleStyle.revision;
-        return BubbleStyle.rectFor(canvasSize.width, canvasSize.height);
-    }
-    readonly property real cornerRadius: {
-        BubbleStyle.revision;
-        return BubbleStyle.radiusFor(area.width, area.height);
-    }
-    readonly property real borderWidth: {
-        BubbleStyle.revision;
-        return BubbleStyle.borderFor(canvasSize.width, canvasSize.height);
-    }
+    // QML can't see inside C++ function calls, so a binding like rectFor(...) alone would never
+    // update when the style changes. Reading BubbleStyle.revision (bumped on every change, and
+    // always >= 0) makes it part of each binding's dependencies.
+    readonly property rect area: BubbleStyle.revision >= 0
+                                 ? BubbleStyle.rectFor(canvasSize.width, canvasSize.height)
+                                 : Qt.rect(0, 0, 0, 0)
+    readonly property real cornerRadius: BubbleStyle.revision >= 0 ? BubbleStyle.radiusFor(area.width, area.height) : 0
+    readonly property real borderWidth: BubbleStyle.revision >= 0
+                                        ? BubbleStyle.borderFor(canvasSize.width, canvasSize.height)
+                                        : 0
     readonly property bool dragging: moveDrag.active || resizeDrag.active
 
     x: area.x
