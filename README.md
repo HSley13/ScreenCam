@@ -10,7 +10,10 @@ built with CMake. Runs on **macOS, Windows and Linux** from the same code.
   The window list shows only real app windows ("Safari — GitHub"), not the menu bar, its
   icons (clock, battery, CPU meters), the Dock, the taskbar or tool pop-ups.
 - While recording, your camera floats on the desktop as a **bubble window** you can drag
-  anywhere, next to a **small floating control bar** (pause / stop / timer). ScreenCam's own
+  anywhere, with the **recording controls attached under it**: timer, what is being recorded,
+  **pause** and **stop** (Screen-only recordings get the same controls as a small floating bar).
+  A **coloured frame with a name tag** ("● Recording · Safari — GitHub") marks the window or
+  region being recorded and follows the window if you move it. ScreenCam's own
   windows are left out of the recording on macOS and Windows, so the preview never shows an
   endless "screen inside the screen".
 - **Edit after recording**: a Screen + Camera recording is saved as a *project*. In the editor,
@@ -425,6 +428,9 @@ Dependencies point downwards only: `qml → app → export → media → core`.
   button, timer (tabular digits so it doesn't jiggle), pause/stop, play last recording.
 - **`FloatingBubble.qml`, `MiniControlBar.qml`, `RegionSelector.qml`** — the desktop bubble
   window, the floating recording controls, and the full-screen rubber band for regions.
+- **`RecordingControls.qml`** — the recording pill (timer, `Capture.targetLabel`, pause, stop)
+  used under the bubble and in the mini bar. **`RecordingOutline.qml`** — a click-through
+  (`Qt.WindowTransparentForInput`) frame placed from `Capture.targetBounds()` 4× per second.
 - **`EditorPage.qml`** — two `MediaPlayer`s: screen (with audio) is the master clock; the
   camera follows at `position − cameraOffsetMs`, re-synced on every seek/play/pause and when
   it drifts more than 120 ms. The bubble is the same `CameraBubble` as the recorder, fed by
