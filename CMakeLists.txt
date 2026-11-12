@@ -19,6 +19,26 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 # ---------------------------------------------------------------------------
+# Portable core: plain C++20, no Apple frameworks -> builds and tests anywhere
+# ---------------------------------------------------------------------------
+add_library(screencam_core STATIC
+    src/core/Resolution.cpp
+    src/core/CameraLayout.cpp
+    src/core/EncoderPlan.cpp
+    src/core/TimeFormat.cpp
+)
+target_include_directories(screencam_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_compile_options(screencam_core PRIVATE -Wall -Wextra -Wpedantic)
+
+option(SCREENCAM_BUILD_TESTS "Build the core unit tests" ON)
+if(SCREENCAM_BUILD_TESTS)
+    enable_testing()
+    add_executable(core_tests tests/core_tests.cpp)
+    target_link_libraries(core_tests PRIVATE screencam_core)
+    add_test(NAME core_tests COMMAND core_tests)
+endif()
+
+# ---------------------------------------------------------------------------
 # macOS application bundle (Objective-C++ glue around AppKit / AVFoundation)
 # ---------------------------------------------------------------------------
 if(APPLE)
@@ -37,6 +57,7 @@ if(APPLE)
         $<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>
         -Wall -Wextra -Wno-unused-parameter)
     target_link_libraries(ScreenCam PRIVATE
+        screencam_core
         "-framework AppKit")
 
     set_target_properties(ScreenCam PROPERTIES
