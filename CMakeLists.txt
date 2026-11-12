@@ -73,6 +73,7 @@ if(SCREENCAM_BUILD_APP)
             set_tests_properties(${name} PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
         endfunction()
         screencam_add_qt_test(tst_compositor)
+        screencam_add_qt_test(tst_pipeline)
     endif()
 
     set(SCREENCAM_APP_SOURCES
