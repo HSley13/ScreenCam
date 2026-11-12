@@ -1,11 +1,8 @@
 cmake_minimum_required(VERSION 3.24)
 
-# Must be set before project() so CMake passes -mmacosx-version-min to every compiler.
-set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0" CACHE STRING "Minimum macOS version")
-
 project(ScreenCam
-    VERSION 0.1.0
-    DESCRIPTION "Screen recorder with a draggable camera bubble"
+    VERSION 0.2.0
+    DESCRIPTION "Cross-platform screen recorder with a draggable camera bubble"
     LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -18,19 +15,27 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
 endif()
 
+option(SCREENCAM_BUILD_APP "Build the Qt application (needs Qt 6.8 or newer)" ON)
+option(SCREENCAM_BUILD_TESTS "Build the unit tests" ON)
+
+if(MSVC)
+    set(SCREENCAM_WARNINGS /W4 /permissive-)
+else()
+    set(SCREENCAM_WARNINGS -Wall -Wextra -Wpedantic)
+endif()
+
 # ---------------------------------------------------------------------------
-# Portable core: plain C++20, no Apple frameworks -> builds and tests anywhere
+# Portable core: plain C++20, no Qt -> geometry, sizes, pixel conversion.
 # ---------------------------------------------------------------------------
 add_library(screencam_core STATIC
-    src/core/Resolution.cpp
     src/core/CameraLayout.cpp
     src/core/EncoderPlan.cpp
+    src/core/Resolution.cpp
     src/core/TimeFormat.cpp
 )
 target_include_directories(screencam_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_compile_options(screencam_core PRIVATE -Wall -Wextra -Wpedantic)
+target_compile_options(screencam_core PRIVATE ${SCREENCAM_WARNINGS})
 
-option(SCREENCAM_BUILD_TESTS "Build the core unit tests" ON)
 if(SCREENCAM_BUILD_TESTS)
     enable_testing()
     add_executable(core_tests tests/core_tests.cpp)
@@ -39,56 +44,44 @@ if(SCREENCAM_BUILD_TESTS)
 endif()
 
 # ---------------------------------------------------------------------------
-# macOS application bundle (Objective-C++ glue around AppKit / AVFoundation)
+# Qt application: C++ backend (capture, compositing, encoding) + QML front end.
 # ---------------------------------------------------------------------------
-if(APPLE)
-    enable_language(OBJCXX)
-    set(CMAKE_OBJCXX_STANDARD 20)
-    set(CMAKE_OBJCXX_STANDARD_REQUIRED ON)
+if(SCREENCAM_BUILD_APP)
+    find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Widgets Qml Quick QuickControls2 Multimedia)
+    qt_standard_project_setup(REQUIRES 6.8)
 
     set(SCREENCAM_APP_SOURCES
-        src/app/main.mm
-        src/app/AppDelegate.mm
-        src/platform/CameraCapture.mm
-        src/platform/ClockSync.mm
-        src/platform/DeviceCatalog.mm
-        src/platform/MicCapture.mm
-        src/platform/ScreenCapture.mm
-        src/recording/MovieWriter.mm
-        src/recording/RecordingSession.mm
-        src/ui/CameraBubbleWindow.mm
-        src/ui/ControlPanelController.mm
     )
+    set(SCREENCAM_QML_FILES
+        qml/Main.qml
+        qml/Theme.qml
+    )
+    set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
-    add_executable(ScreenCam MACOSX_BUNDLE ${SCREENCAM_APP_SOURCES})
+    qt_add_executable(ScreenCam WIN32 MACOSX_BUNDLE src/app/main.cpp)
+    qt_add_qml_module(ScreenCam
+        URI ScreenCam
+        VERSION 1.0
+        # Keep the module's generated files out of the way of the "ScreenCam" executable,
+        # which would otherwise collide with a "ScreenCam/" directory in the build tree.
+        OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/qml/ScreenCam
+        QML_FILES ${SCREENCAM_QML_FILES}
+        SOURCES ${SCREENCAM_APP_SOURCES}
+    )
     target_include_directories(ScreenCam PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-    target_compile_options(ScreenCam PRIVATE
-        $<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>
-        -Wall -Wextra -Wno-unused-parameter)
+    target_compile_definitions(ScreenCam PRIVATE SCREENCAM_VERSION="${PROJECT_VERSION}")
     target_link_libraries(ScreenCam PRIVATE
         screencam_core
-        "-framework AppKit"
-        "-framework AVFoundation"
-        "-framework CoreGraphics"
-        "-framework CoreMedia"
-        "-framework CoreVideo"
-        "-framework QuartzCore"
-        "-framework ScreenCaptureKit")
+        Qt6::Widgets
+        Qt6::Quick
+        Qt6::QuickControls2
+        Qt6::Multimedia)
 
     set_target_properties(ScreenCam PROPERTIES
+        # macOS: camera/microphone usage strings live in this Info.plist template.
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Info.plist.in"
         MACOSX_BUNDLE_GUI_IDENTIFIER "com.hsley13.screencam"
         MACOSX_BUNDLE_BUNDLE_NAME "ScreenCam"
         MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}")
-
-    # macOS only shows the camera / microphone / screen-recording prompts for a
-    # *signed* bundle whose Info.plist is sealed into the signature. An ad-hoc
-    # signature ("-") is enough for local development.
-    add_custom_command(TARGET ScreenCam POST_BUILD
-        COMMAND codesign --force --sign - "$<TARGET_BUNDLE_DIR:ScreenCam>"
-        COMMENT "Ad-hoc signing ScreenCam.app"
-        VERBATIM)
-else()
-    message(STATUS "Not building on macOS: the ScreenCam app target is skipped.")
 endif()
