@@ -50,6 +50,7 @@ if(APPLE)
         src/app/main.mm
         src/app/AppDelegate.mm
         src/platform/DeviceCatalog.mm
+        src/ui/ControlPanelController.mm
     )
 
     add_executable(ScreenCam MACOSX_BUNDLE ${SCREENCAM_APP_SOURCES})
