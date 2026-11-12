@@ -70,6 +70,7 @@ if(SCREENCAM_BUILD_APP)
         src/media/BubbleStyleSnapshot.cpp src/media/BubbleStyleSnapshot.hpp
         src/media/FrameCompositor.cpp src/media/FrameCompositor.hpp
         src/media/MediaBackendCheck.cpp src/media/MediaBackendCheck.hpp
+        src/media/Project.cpp src/media/Project.hpp
         src/media/RecordingPipeline.cpp src/media/RecordingPipeline.hpp
     )
     target_include_directories(screencam_media PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
