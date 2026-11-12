@@ -170,6 +170,18 @@ void testAspectFillCrop() {
     CHECK(near(landscape.width, 1080) && near(landscape.height, 607.5));
 }
 
+void testAspectFitRect() {
+    // Same aspect: fills the target exactly.
+    const RectD same = aspectFitRect(SizeD{1920, 1080}, SizeD{1280, 720});
+    CHECK(near(same.x, 0) && near(same.y, 0) && near(same.width, 1280) && near(same.height, 720));
+    // A square window in a 16:9 video: pillarboxed in the middle.
+    const RectD square = aspectFitRect(SizeD{800, 800}, SizeD{1600, 900});
+    CHECK(near(square.width, 900) && near(square.height, 900) && near(square.x, 350) && near(square.y, 0));
+    // A wide window in a 16:9 video: letterboxed top and bottom.
+    const RectD wide = aspectFitRect(SizeD{2000, 500}, SizeD{1600, 900});
+    CHECK(near(wide.width, 1600) && near(wide.height, 400) && near(wide.y, 250));
+}
+
 void testYuvColours() {
     const YuvPixel black = rgbToYuv709(0, 0, 0);
     CHECK(black.y == 16 && black.u == 128 && black.v == 128);
@@ -220,6 +232,7 @@ int main() {
     testBubbleRectClamping();
     testSnapping();
     testAspectFillCrop();
+    testAspectFitRect();
     testYuvColours();
     testNv12Conversion();
     testAudioLevel();
