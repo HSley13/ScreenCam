@@ -4,6 +4,7 @@
 #include "app/RecordingSettings.hpp"
 #include "core/CameraLayout.hpp"
 #include "core/Resolution.hpp"
+#include "media/MediaBackendCheck.hpp"
 
 #include <QCameraDevice>
 #include <QCameraFormat>
@@ -14,6 +15,15 @@
 namespace core = screencam::core;
 
 namespace {
+
+constexpr int kScreenWatchdogMs = 4000;
+
+QString noScreenPictureMessage() {
+    return QCoreApplication::translate(
+        "CaptureSources",
+        "The screen capture is running but delivers no picture. On macOS, allow ScreenCam under System Settings ▸ "
+        "Privacy & Security ▸ Screen & System Audio Recording, then quit and reopen it.");
+}
 
 /// Best camera mode for a bubble: the largest resolution up to 1080p that runs at >= 24 fps
 /// (falls back to the largest mode if none is that fast). 4K webcam modes would only cost CPU,
@@ -62,7 +72,11 @@ CaptureSources *CaptureSources::create(QQmlEngine *, QJSEngine *) {
 }
 
 CaptureSources::CaptureSources(QObject *parent)
-    : QObject(parent) {
+    : QObject(parent)
+    , m_backendProblem(MediaBackendCheck::currentProblem()) {
+    if (!m_backendProblem.isEmpty()) {
+        qWarning().noquote() << "ScreenCam:" << m_backendProblem;
+    }
     m_screenSession.setScreenCapture(&m_screenCapture);
     m_screenSession.setVideoSink(&m_screenSink);
     m_cameraSession.setVideoSink(&m_cameraSink);
@@ -70,6 +84,13 @@ CaptureSources::CaptureSources(QObject *parent)
     // Frames may be produced on a media thread; using `this` as context makes Qt deliver
     // them on the main thread, where the QML previews live.
     connect(&m_screenSink, &QVideoSink::videoFrameChanged, this, [this](const QVideoFrame &frame) {
+        if (!m_screenFrameSeen) {
+            m_screenFrameSeen = true;
+            m_screenWatchdog.stop();
+            if (m_screenError == noScreenPictureMessage()) {
+                setScreenError(QString());
+            }
+        }
         forward(m_screenPreviews, frame);
         emit screenFrameArrived(frame);
     });
@@ -84,6 +105,16 @@ CaptureSources::CaptureSources(QObject *parent)
     });
 
     connect(&m_screenCapture, &QScreenCapture::activeChanged, this, &CaptureSources::screenActiveChanged);
+
+    // Without permission (macOS) some backends start "successfully" but never deliver a
+    // frame; say so instead of showing an empty preview forever.
+    m_screenWatchdog.setSingleShot(true);
+    m_screenWatchdog.setInterval(kScreenWatchdogMs);
+    connect(&m_screenWatchdog, &QTimer::timeout, this, [this] {
+        if (m_screenCapture.isActive() && !m_screenFrameSeen && m_screenError.isEmpty()) {
+            setScreenError(noScreenPictureMessage());
+        }
+    });
     connect(&m_screenCapture, &QScreenCapture::errorOccurred, this,
             [this](QScreenCapture::Error, const QString &message) {
                 setScreenError(message.isEmpty() ? tr("Screen capture failed.") : message);
@@ -137,8 +168,19 @@ void CaptureSources::updateScreen() {
         emit outputSizeChanged();
     }
     const bool wanted = settings->usesScreen() && wantsInputs() && screen != nullptr;
-    if (wanted) {
+    if (!m_backendProblem.isEmpty()) {
+        // The native backends have no screen capture: don't pretend, explain.
+        setScreenError(m_backendProblem);
+        m_screenCapture.setActive(false);
+        return;
+    }
+    if (wanted && !m_screenCapture.isActive()) {
         setScreenError(QString());
+        m_screenFrameSeen = false;
+        m_screenWatchdog.start();
+    }
+    if (!wanted) {
+        m_screenWatchdog.stop();
     }
     m_screenCapture.setActive(wanted);
 }

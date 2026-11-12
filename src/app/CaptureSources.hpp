@@ -7,6 +7,7 @@
 #include <QPointer>
 #include <QScreenCapture>
 #include <QSize>
+#include <QTimer>
 #include <QVideoFrame>
 #include <QVideoSink>
 #include <QtQml/qqmlregistration.h>
@@ -33,6 +34,8 @@ class CaptureSources : public QObject {
     Q_PROPERTY(bool cameraActive READ cameraActive NOTIFY cameraActiveChanged)
     Q_PROPERTY(QString screenError READ screenError NOTIFY screenErrorChanged)
     Q_PROPERTY(QString cameraError READ cameraError NOTIFY cameraErrorChanged)
+    // Non-empty when Qt lacks the FFmpeg backend: screen capture and recording can't work.
+    Q_PROPERTY(QString backendProblem READ backendProblem CONSTANT)
     Q_PROPERTY(QSize screenSize READ screenSize NOTIFY outputSizeChanged)
     Q_PROPERTY(QSize cameraResolution READ cameraResolution NOTIFY cameraResolutionChanged)
     Q_PROPERTY(QSize outputSize READ outputSize NOTIFY outputSizeChanged)
@@ -50,6 +53,7 @@ public:
     bool cameraActive() const { return m_camera != nullptr && m_camera->isActive(); }
     QString screenError() const { return m_screenError; }
     QString cameraError() const { return m_cameraError; }
+    QString backendProblem() const { return m_backendProblem; }
     QSize cameraResolution() const { return m_cameraResolution; }
     /// Real pixel size of the selected screen.
     QSize screenSize() const;
@@ -88,6 +92,8 @@ private:
     QVideoSink m_screenSink;
     QList<QPointer<QVideoSink>> m_screenPreviews;
     QString m_screenError;
+    QTimer m_screenWatchdog;  // fires if an active screen capture delivers no frame
+    bool m_screenFrameSeen = false;
 
     // Camera
     QMediaCaptureSession m_cameraSession;
@@ -98,6 +104,7 @@ private:
     QString m_cameraError;
     QSize m_cameraResolution;
 
+    QString m_backendProblem;
     bool m_previewEnabled = false;
     bool m_recordingActive = false;
 };
