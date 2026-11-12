@@ -300,6 +300,7 @@ QVideoFrame FrameCompositor::toNv12Frame(const QImage &canvas, int framesPerSeco
 
 void FrameCompositor::start() {
     m_clock.start();
+    emit clockStarted(m_clock.msecsSinceReference());
     m_pausedNs = 0;
     m_pauseStartedNs = -1;
     m_lastTimestampUs = -1;

@@ -69,6 +69,9 @@ public:
 
 signals:
     void frameReady(const QVideoFrame &frame);
+    /// Video time 0, on the machine's monotonic clock (QElapsedTimer::msecsSinceReference):
+    /// lets two recordings made in parallel be lined up afterwards.
+    void clockStarted(qint64 referenceMs);
 
 private:
     void tick();
