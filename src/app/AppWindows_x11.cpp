@@ -4,6 +4,9 @@
 #include "app/AppWindows.hpp"
 #include "core/WindowFilter.hpp"
 
+#include <QGuiApplication>
+#include <QScreen>
+
 #include <algorithm>
 #include <vector>
 
@@ -150,4 +153,26 @@ QHash<quintptr, AppWindow> listAppWindows(bool *supported) {
     }
     XCloseDisplay(display);
     return result;
+}
+
+QRect appWindowBounds(quintptr id) {
+    // One connection for the app's lifetime: this is polled several times a second.
+    static Display *display = XOpenDisplay(nullptr);
+    if (display == nullptr) {
+        return {};
+    }
+    const auto window = static_cast<Window>(id);
+    XWindowAttributes attributes{};
+    if (XGetWindowAttributes(display, window, &attributes) == 0 || attributes.map_state != IsViewable) {
+        return {};
+    }
+    int x = 0;
+    int y = 0;
+    Window child = None;
+    XTranslateCoordinates(display, window, DefaultRootWindow(display), 0, 0, &x, &y, &child);
+    // X11 measures in physical pixels; Qt divides by the scale factor (QT_SCALE_FACTOR etc.).
+    const QScreen *screen = QGuiApplication::primaryScreen();
+    const qreal ratio = screen != nullptr ? screen->devicePixelRatio() : 1.0;
+    return QRect(qRound(x / ratio), qRound(y / ratio), qRound(attributes.width / ratio),
+                 qRound(attributes.height / ratio));
 }

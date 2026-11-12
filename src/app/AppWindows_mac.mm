@@ -82,3 +82,32 @@ QHash<quintptr, AppWindow> listAppWindows(bool *supported) {
     }
     return result;
 }
+
+QRect appWindowBounds(quintptr id) {
+    QRect bounds;
+    @autoreleasepool {
+        // The API takes an array of window ids stored *as pointer values*.
+        const void *windowId = reinterpret_cast<const void *>(static_cast<uintptr_t>(id));
+        CFArrayRef ids = CFArrayCreate(nullptr, &windowId, 1, nullptr);
+        CFArrayRef list = CGWindowListCreateDescriptionFromArray(ids);
+        CFRelease(ids);
+        if (list == nullptr) {
+            return bounds;
+        }
+        NSArray *windows = (__bridge NSArray *)list;
+        if (windows.count > 0) {
+            NSDictionary *info = windows.firstObject;
+            NSDictionary *boundsInfo = value(info, kCGWindowBounds);
+            CGRect rect = CGRectZero;
+            const bool onScreen = [value(info, kCGWindowIsOnscreen) boolValue];
+            if (onScreen && boundsInfo != nil &&
+                CGRectMakeWithDictionaryRepresentation((__bridge CFDictionaryRef)boundsInfo, &rect)) {
+                // Quartz and Qt both measure in points from the top-left of the main display.
+                bounds = QRect(qRound(rect.origin.x), qRound(rect.origin.y), qRound(rect.size.width),
+                               qRound(rect.size.height));
+            }
+        }
+        CFRelease(list);
+    }
+    return bounds;
+}
