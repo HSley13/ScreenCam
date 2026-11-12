@@ -31,7 +31,7 @@ class ProjectEditor : public QObject {
     Q_PROPERTY(QUrl cameraUrl READ cameraUrl NOTIFY projectChanged)
     Q_PROPERTY(bool hasCamera READ hasCamera NOTIFY projectChanged)
     Q_PROPERTY(QSize canvasSize READ canvasSize NOTIFY projectChanged)
-    Q_PROPERTY(qint64 durationMs READ durationMs WRITE setDurationMs NOTIFY projectChanged)
+    Q_PROPERTY(qint64 durationMs READ durationMs WRITE setDurationMs NOTIFY durationChanged)
     Q_PROPERTY(qint64 cameraOffsetMs READ cameraOffsetMs WRITE setCameraOffsetMs NOTIFY cameraOffsetChanged)
     Q_PROPERTY(qint64 recordedCameraOffsetMs READ recordedCameraOffsetMs NOTIFY projectChanged)
     Q_PROPERTY(QVariantList segments READ segments NOTIFY segmentsChanged)
@@ -101,6 +101,7 @@ public:
 
 signals:
     void projectChanged();
+    void durationChanged();  // separate: must not make QML reload the video sources
     void segmentsChanged();
     void currentChanged();
     void cameraOffsetChanged();

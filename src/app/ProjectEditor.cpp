@@ -58,6 +58,7 @@ bool ProjectEditor::open(const QString &location) {
     setErrorText(QString());
     loadCurrentStyle();
     emit projectChanged();
+    emit durationChanged();
     emit cameraOffsetChanged();
     emit segmentsChanged();
     emit currentChanged();
@@ -76,6 +77,7 @@ void ProjectEditor::close() {
     m_loaded = false;
     m_current = 0;
     emit projectChanged();
+    emit durationChanged();
     emit segmentsChanged();
     emit currentChanged();
 }
@@ -230,7 +232,7 @@ void ProjectEditor::setDurationMs(qint64 durationMs) {
         return;
     }
     m_project.durationMs = durationMs;
-    emit projectChanged();
+    emit durationChanged();
     emit segmentsChanged();  // the last segment's end moved
     emit currentChanged();
     markDirty();

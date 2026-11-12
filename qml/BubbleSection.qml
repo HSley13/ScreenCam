@@ -16,7 +16,7 @@ SidebarSection {
     readonly property bool bubbleMode: editorMode || RecordingSettings.mode === RecordingSettings.ScreenAndCamera
     readonly property bool cameraOnly: !editorMode && RecordingSettings.mode === RecordingSettings.CameraOnly
 
-    title: editorMode ? qsTr("This segment") : qsTr("Camera")
+    title: editorMode ? qsTr("Camera look") : qsTr("Camera")
     visible: editorMode || ((bubbleMode || cameraOnly) && RecordingSettings.cameraId.length > 0)
 
     // --- Camera-only mode -------------------------------------------------------------

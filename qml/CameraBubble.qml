@@ -13,6 +13,9 @@ Item {
     // Any object with BubbleStyle's API (the editor passes the current segment's style).
     property var bubbleStyle: BubbleStyle
     property bool live: true
+    // Glide on shape/position changes. The editor turns it off: there a segment change is a
+    // hard cut in the exported video, so the preview cuts too.
+    property bool animated: true
     property string placeholderText: ""
     readonly property alias video: look.video
 
@@ -34,10 +37,10 @@ Item {
     height: area.height
 
     // Shape and size changes glide; while dragging the bubble follows the pointer exactly.
-    Behavior on x { enabled: !bubble.dragging; NumberAnimation { duration: Theme.animationNormal; easing.type: Easing.OutCubic } }
-    Behavior on y { enabled: !bubble.dragging; NumberAnimation { duration: Theme.animationNormal; easing.type: Easing.OutCubic } }
-    Behavior on width { enabled: !bubble.dragging; NumberAnimation { duration: Theme.animationNormal; easing.type: Easing.OutCubic } }
-    Behavior on height { enabled: !bubble.dragging; NumberAnimation { duration: Theme.animationNormal; easing.type: Easing.OutCubic } }
+    Behavior on x { enabled: bubble.animated && !bubble.dragging; NumberAnimation { duration: Theme.animationNormal; easing.type: Easing.OutCubic } }
+    Behavior on y { enabled: bubble.animated && !bubble.dragging; NumberAnimation { duration: Theme.animationNormal; easing.type: Easing.OutCubic } }
+    Behavior on width { enabled: bubble.animated && !bubble.dragging; NumberAnimation { duration: Theme.animationNormal; easing.type: Easing.OutCubic } }
+    Behavior on height { enabled: bubble.animated && !bubble.dragging; NumberAnimation { duration: Theme.animationNormal; easing.type: Easing.OutCubic } }
 
     BubbleView {
         id: look

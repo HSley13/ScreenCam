@@ -108,6 +108,9 @@ if(SCREENCAM_BUILD_APP)
         qml/CameraBubble.qml
         qml/ControlBar.qml
         qml/CountdownOverlay.qml
+        qml/EditorInspector.qml
+        qml/EditorPage.qml
+        qml/EditorTimeline.qml
         qml/ErrorBanner.qml
         qml/FloatingBubble.qml
         qml/Main.qml
