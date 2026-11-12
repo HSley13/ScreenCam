@@ -55,19 +55,26 @@ if(SCREENCAM_BUILD_APP)
 
     set(SCREENCAM_APP_SOURCES
         src/app/AudioLevelMeter.cpp src/app/AudioLevelMeter.hpp
+        src/app/BubbleStyle.cpp src/app/BubbleStyle.hpp
+        src/app/CaptureSources.cpp src/app/CaptureSources.hpp
         src/app/DeviceCatalog.cpp src/app/DeviceCatalog.hpp
         src/app/RecordingSettings.cpp src/app/RecordingSettings.hpp
     )
     set(SCREENCAM_QML_FILES
+        qml/BubbleSection.qml
+        qml/CameraBubble.qml
         qml/Main.qml
+        qml/PreviewStage.qml
         qml/SettingsPanel.qml
         qml/Theme.qml
         qml/components/Field.qml
         qml/components/LevelMeter.qml
         qml/components/SegmentedControl.qml
+        qml/components/ShapePicker.qml
         qml/components/SidebarSection.qml
         qml/components/StyledButton.qml
         qml/components/StyledComboBox.qml
+        qml/components/StyledSlider.qml
         qml/components/StyledSwitch.qml
     )
     set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
@@ -79,6 +86,8 @@ if(SCREENCAM_BUILD_APP)
         # Keep the module's generated files out of the way of the "ScreenCam" executable,
         # which would otherwise collide with a "ScreenCam/" directory in the build tree.
         OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/qml/ScreenCam
+        # C++ types use QtQuick value types (color, size, rect): tell the tooling about it.
+        DEPENDENCIES QtQuick
         QML_FILES ${SCREENCAM_QML_FILES}
         SOURCES ${SCREENCAM_APP_SOURCES}
     )
