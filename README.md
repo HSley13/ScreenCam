@@ -23,20 +23,46 @@ built with CMake. Runs on **macOS, Windows and Linux** from the same code.
 
 ## Build and install
 
-Requirements: **Qt 6.8 or newer** with the **Qt Multimedia** module, **CMake ≥ 3.24**,
+Requirements: **Qt 6.8 or newer** with **Qt Multimedia and its FFmpeg backend**, **CMake ≥ 3.24**,
 **Ninja**, and a C++20 compiler.
+
+> **The FFmpeg backend is not optional.** Screen capture (`QScreenCapture`) and feeding the
+> composited frames to the encoder (`QVideoFrameInput`) only exist in Qt Multimedia's FFmpeg
+> backend. Qt from the **Qt Online Installer** includes it. Homebrew's Qt does **not** (its
+> `qtmultimedia` formula has no FFmpeg dependency), and a Qt you compiled yourself only has it
+> if you configured it with `-ffmpeg-dir`. CMake prints a warning when the Qt it finds lacks it,
+> and the app shows a banner explaining it.
+> Check: your Qt's `plugins/multimedia/` must contain `libffmpegmediaplugin.*`
+> (`ffmpegmediaplugin.dll` on Windows), not only `libdarwinmediaplugin.dylib`.
 
 ### macOS
 
+Install Qt 6.8+ for macOS **with Qt Multimedia** using the Qt Online Installer, then:
+
 ```bash
-brew install qt cmake ninja
-cmake --preset release
+brew install cmake ninja
+cmake --preset release -DCMAKE_PREFIX_PATH=$HOME/Qt/6.10.1/macos   # your Qt version
 cmake --build --preset release
 open build/release/ScreenCam.app
 
-# Install a self-contained copy (Qt is copied into the bundle):
+# Install a self-contained copy (Qt and FFmpeg are copied into the bundle):
 cmake --install build/release --prefix ~/Applications
 ```
+
+**Using a Qt you built from source** (e.g. `/usr/local/Qt-6.10.0`): rebuild Qt Multimedia
+with FFmpeg. Use the FFmpeg major version Qt documents for your Qt (7.1 for Qt 6.10):
+
+```bash
+brew install ffmpeg@7
+mkdir ~/qt-build-multimedia && cd ~/qt-build-multimedia
+<qt-source>/configure -prefix /usr/local/Qt-6.10.0 -submodules qtmultimedia \
+    -ffmpeg-dir "$(brew --prefix ffmpeg@7)" -ffmpeg-deploy
+grep -i ffmpeg config.summary        # must say "yes"
+cmake --build . --parallel && cmake --install .
+```
+
+Afterwards `/usr/local/Qt-6.10.0/plugins/multimedia/` contains `libffmpegmediaplugin.dylib`.
+Re-run CMake for ScreenCam (`rm -rf build && cmake --preset release`).
 
 Permissions: macOS asks for **Camera** and **Microphone** the first time. **Screen Recording**
 must be enabled in *System Settings ▸ Privacy & Security ▸ Screen & System Audio Recording*;
@@ -56,8 +82,8 @@ cmake --install build/release --prefix "%LOCALAPPDATA%/Programs/ScreenCam"
 
 ### Linux
 
-Use Qt 6.8+ (Qt Online Installer, or a distro that ships it, e.g. Arch or recent Fedora;
-Ubuntu 24.04's Qt 6.4 is too old).
+Use Qt 6.8+ from the Qt Online Installer (includes FFmpeg). Distro packages work only if they
+ship the FFmpeg multimedia plugin (`libffmpegmediaplugin.so`); Ubuntu 24.04's Qt 6.4 is too old.
 
 ```bash
 cmake --preset release -DCMAKE_PREFIX_PATH=$HOME/Qt/6.8.3/gcc_64
@@ -241,7 +267,11 @@ Dependencies point downwards only: `qml → app → media → core`.
 
 ## Troubleshooting
 
-- **Black screen preview on macOS** — grant Screen Recording (see above) and reopen the app.
+- **Empty screen preview + banner "built without the FFmpeg multimedia backend"** — your Qt
+  has only the native backend (e.g. `plugins/multimedia/libdarwinmediaplugin.dylib`). Install
+  Qt with the Qt Online Installer, or rebuild Qt Multimedia with `-ffmpeg-dir` (see *macOS*).
+- **"The screen capture is running but delivers no picture"** — on macOS, grant Screen
+  Recording (see above) and reopen the app.
 - **Log lines `Packet with invalid duration … in stream 0`** — printed by FFmpeg's MP4 muxer
   for B-frames that Qt 6.8 doesn't give a duration. Harmless: `tst_pipeline` checks that
   frame times increase and the file plays with the right duration.

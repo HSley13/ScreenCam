@@ -102,6 +102,10 @@ QString RecordingController::validate() const {
     const RecordingSettings *settings = RecordingSettings::instance();
     const CaptureSources *capture = CaptureSources::instance();
 
+    // Recording feeds frames through QVideoFrameInput, which needs the FFmpeg backend in every mode.
+    if (!capture->backendProblem().isEmpty()) {
+        return capture->backendProblem();
+    }
     if (settings->mode() == RecordingSettings::CaptureMode::CameraOnly) {
         if (settings->cameraId().isEmpty()) {
             return tr("Choose a camera to record in Camera mode.");
