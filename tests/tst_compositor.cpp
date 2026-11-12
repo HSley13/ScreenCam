@@ -117,6 +117,36 @@ private slots:
         QVERIFY(closeTo(canvas.pixelColor(5, 180), Qt::cyan, 60));  // edges still from the strip
     }
 
+    void regionCropRecordsOnlyThatPart() {
+        // Screen: left half red, right half blue. Record only the right half.
+        QImage screen(800, 400, QImage::Format_RGB32);
+        screen.fill(Qt::red);
+        for (int y = 0; y < screen.height(); y++) {
+            for (int x = 400; x < 800; x++) {
+                screen.setPixelColor(x, y, Qt::blue);
+            }
+        }
+        CompositorConfig config = baseConfig(CompositeLayout::ScreenOnly);
+        config.canvasSize = QSize(400, 400);
+        config.sourceCrop = QRectF(0.5, 0.0, 0.5, 1.0);
+        FrameCompositor compositor;
+        compositor.configure(config);
+        compositor.setScreenImage(screen);
+        const QImage canvas = compositor.renderCanvas();
+        QVERIFY(closeTo(canvas.pixelColor(5, 200), Qt::blue));
+        QVERIFY(closeTo(canvas.pixelColor(395, 200), Qt::blue));
+    }
+
+    void differentlyShapedSourceIsLetterboxed() {
+        // A square window recorded into a 640x360 canvas: centred, black bars left and right.
+        FrameCompositor compositor;
+        compositor.configure(baseConfig(CompositeLayout::ScreenOnly));
+        compositor.setScreenImage(solid(QSize(500, 500), Qt::green));
+        const QImage canvas = compositor.renderCanvas();
+        QVERIFY(closeTo(canvas.pixelColor(320, 180), Qt::green));  // centre: the window
+        QVERIFY(closeTo(canvas.pixelColor(10, 180), QColor(7, 8, 11)));  // side: background
+    }
+
     void nv12FrameHasTheRightFormat() {
         const QVideoFrame frame = FrameCompositor::toNv12Frame(solid(QSize(64, 32), Qt::white), 30);
         QVERIFY(frame.isValid());

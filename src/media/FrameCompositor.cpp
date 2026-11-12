@@ -131,14 +131,26 @@ QImage FrameCompositor::renderCanvas() {
         return canvas;
     }
 
-    // The canvas has the screen's aspect ratio (computeCaptureSize keeps it): plain scaling.
-    if (!m_screenImage.isNull()) {
-        painter.drawImage(QRectF(canvas.rect()), m_screenImage);
-    }
+    drawScreen(painter, QRectF(canvas.rect()));
     if (m_config.layout == CompositeLayout::ScreenWithBubble && !m_cameraImage.isNull()) {
         drawBubble(painter);
     }
     return canvas;
+}
+
+void FrameCompositor::drawScreen(QPainter &painter, const QRectF &canvas) const {
+    if (m_screenImage.isNull()) {
+        return;
+    }
+    // 1) The part of the frame to record (all of it, or the selected region).
+    const QRectF crop = m_config.sourceCrop.isValid() ? m_config.sourceCrop : QRectF(0.0, 0.0, 1.0, 1.0);
+    const QRectF source(crop.x() * m_screenImage.width(), crop.y() * m_screenImage.height(),
+                        crop.width() * m_screenImage.width(), crop.height() * m_screenImage.height());
+    // 2) Fit it into the canvas. Screens and regions already have the canvas's aspect ratio, so
+    //    this fills it; a window resized mid-recording gets black bars instead of being stretched.
+    const core::RectD fit = core::aspectFitRect(core::SizeD{source.width(), source.height()},
+                                                core::SizeD{canvas.width(), canvas.height()});
+    painter.drawImage(QRectF(canvas.x() + fit.x, canvas.y() + fit.y, fit.width, fit.height), m_screenImage, source);
 }
 
 void FrameCompositor::drawCamera(QPainter &painter, const QRectF &target, bool mirrored) const {
