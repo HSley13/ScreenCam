@@ -51,6 +51,7 @@ if(APPLE)
         src/app/AppDelegate.mm
         src/platform/DeviceCatalog.mm
         src/platform/CameraCapture.mm
+        src/ui/CameraBubbleWindow.mm
         src/ui/ControlPanelController.mm
     )
 
@@ -65,7 +66,8 @@ if(APPLE)
         "-framework AVFoundation"
         "-framework CoreGraphics"
         "-framework CoreMedia"
-        "-framework CoreVideo")
+        "-framework CoreVideo"
+        "-framework QuartzCore")
 
     set_target_properties(ScreenCam PROPERTIES
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Info.plist.in"
