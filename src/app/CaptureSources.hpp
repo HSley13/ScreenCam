@@ -48,7 +48,8 @@ class CaptureSources : public QObject {
     Q_PROPERTY(QSize outputSize READ outputSize NOTIFY outputSizeChanged)
     // Normalized part of the screen frame that is recorded (whole frame unless Region).
     Q_PROPERTY(QRectF sourceCrop READ sourceCrop NOTIFY outputSizeChanged)
-    // Windows that can be recorded: [{ id: <index>, name: <title> }], see refreshWindows().
+    // App windows that can be recorded: [{ id: <index>, name: "App — Title" }], sorted by
+    // name; see refreshWindows().
     Q_PROPERTY(QVariantList windows READ windows NOTIFY windowsChanged)
     Q_PROPERTY(int selectedWindow READ selectedWindow WRITE setSelectedWindow NOTIFY windowsChanged)
 
@@ -121,6 +122,8 @@ private:
     QWindowCapture m_windowCapture;
     QVideoSink m_windowSink;
     QList<QCapturableWindow> m_windows;
+    QStringList m_windowLabels;   // parallel to m_windows
+    QList<quintptr> m_windowIds;  // native ids, to keep the selection across refreshes
     int m_selectedWindow = -1;
     QSize m_windowFrameSize;
     QTimer m_screenWatchdog;  // fires if an active screen capture delivers no frame

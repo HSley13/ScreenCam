@@ -20,6 +20,10 @@ option(SCREENCAM_BUILD_TESTS "Build the unit tests" ON)
 option(SCREENCAM_ENABLE_EXPORT "Video export from the editor (needs the FFmpeg development files)" ON)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
+# Sources are UTF-8 (labels like "Safari — GitHub", "▸"); MSVC would otherwise read them in
+# the system's code page and garble those strings.
+add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+
 if(MSVC)
     set(SCREENCAM_WARNINGS /W4 /permissive-)
 else()
@@ -140,6 +144,7 @@ if(SCREENCAM_BUILD_APP)
     endif()
 
     set(SCREENCAM_APP_SOURCES
+        src/app/AppWindows.hpp
         src/app/AudioLevelMeter.cpp src/app/AudioLevelMeter.hpp
         src/app/BubbleStyle.cpp src/app/BubbleStyle.hpp
         src/app/CaptureSources.cpp src/app/CaptureSources.hpp
@@ -188,14 +193,42 @@ if(SCREENCAM_BUILD_APP)
         set(SCREENCAM_PLATFORM_FILES ${CMAKE_CURRENT_SOURCE_DIR}/packaging/windows/ScreenCam.rc)
     endif()
 
+    # Native window code: hiding our own windows from capture (WindowTools) and listing
+    # the real app windows for "Record ▸ Window" (AppWindows).
+    set(SCREENCAM_PLATFORM_LIBS)
     if(APPLE)
-        enable_language(OBJCXX)  # WindowTools_mac.mm talks to NSWindow
-        list(APPEND SCREENCAM_PLATFORM_FILES src/app/WindowTools_mac.mm)
+        enable_language(OBJCXX)  # these .mm files talk to AppKit (NSWindow, NSRunningApplication)
+        list(APPEND SCREENCAM_PLATFORM_FILES src/app/WindowTools_mac.mm src/app/AppWindows_mac.mm)
+        list(APPEND SCREENCAM_PLATFORM_LIBS "-framework AppKit" "-framework CoreGraphics")
+    elseif(WIN32)
+        list(APPEND SCREENCAM_PLATFORM_FILES src/app/AppWindows_win.cpp)
+        list(APPEND SCREENCAM_PLATFORM_LIBS dwmapi version)  # cloaked windows; app names
+    else()
+        find_package(X11)
+        if(X11_FOUND)
+            list(APPEND SCREENCAM_PLATFORM_FILES src/app/AppWindows_x11.cpp)
+            list(APPEND SCREENCAM_PLATFORM_LIBS X11::X11)
+        else()
+            list(APPEND SCREENCAM_PLATFORM_FILES src/app/AppWindows_other.cpp)
+        endif()
     endif()
 
     qt_add_executable(ScreenCam WIN32 MACOSX_BUNDLE src/app/main.cpp ${SCREENCAM_PLATFORM_FILES})
-    if(APPLE)
-        target_link_libraries(ScreenCam PRIVATE "-framework AppKit")
+    target_link_libraries(ScreenCam PRIVATE ${SCREENCAM_PLATFORM_LIBS})
+
+    # The native id inside a QCapturableWindow (to match it with the OS's window list) is
+    # only reachable through Qt Multimedia's private header. Qt 6.9+ ships private targets
+    # as a separate package; in 6.8 Qt6::MultimediaPrivate comes with Multimedia.
+    # (We use one small, stable struct from it — unchanged from 6.8 to 6.12 — and fall back to
+    # Qt's unfiltered list without it, hence the warning is switched off.)
+    set(QT_NO_PRIVATE_MODULE_WARNING ON)
+    find_package(Qt6 QUIET OPTIONAL_COMPONENTS MultimediaPrivate)
+    if(TARGET Qt6::MultimediaPrivate)
+        target_link_libraries(ScreenCam PRIVATE Qt6::MultimediaPrivate)
+        target_compile_definitions(ScreenCam PRIVATE SCREENCAM_HAS_WINDOW_IDS)
+    else()
+        message(WARNING "Qt Multimedia's private headers weren't found: the window picker will "
+                        "list every window Qt reports (menu bar items included).")
     endif()
     qt_add_qml_module(ScreenCam
         URI ScreenCam
@@ -286,6 +319,17 @@ if(SCREENCAM_BUILD_APP)
         if(SCREENCAM_HAS_EXPORT)
             target_link_libraries(tst_project_editor PRIVATE screencam_export)
             set_tests_properties(tst_project_editor PROPERTIES FIXTURES_REQUIRED sample_project)
+        endif()
+
+        # Window picker on Linux/X11, against a fake desktop on a virtual X server.
+        find_program(SCREENCAM_XVFB_RUN xvfb-run)
+        if(X11_FOUND AND SCREENCAM_XVFB_RUN AND TARGET Qt6::MultimediaPrivate)
+            qt_add_executable(tst_app_windows tests/tst_app_windows.cpp src/app/AppWindows_x11.cpp)
+            target_include_directories(tst_app_windows PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+            target_link_libraries(tst_app_windows PRIVATE
+                screencam_core Qt6::Multimedia Qt6::MultimediaPrivate Qt6::Test X11::X11)
+            add_test(NAME tst_app_windows COMMAND ${SCREENCAM_XVFB_RUN} -a $<TARGET_FILE:tst_app_windows>)
+            set_tests_properties(tst_app_windows PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=xcb")
         endif()
 
         # Editor smoke test: opens the sample project (see make_sample_project above).
