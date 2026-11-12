@@ -6,6 +6,15 @@ built with CMake. Runs on **macOS, Windows and Linux** from the same code.
 **What you can do**
 
 - Record **Screen + Camera**, **Screen only**, or **Camera only** (landscape 16:9 or portrait 9:16).
+- Record the **entire screen**, **one window** (any app), or a **region** you draw on the screen.
+- While recording, your camera floats on the desktop as a **bubble window** you can drag
+  anywhere, next to a **small floating control bar** (pause / stop / timer). ScreenCam's own
+  windows are left out of the recording on macOS and Windows, so the preview never shows an
+  endless "screen inside the screen".
+- **Edit after recording**: a Screen + Camera recording is saved as a *project*. In the editor,
+  split the video into parts on a **timeline** and give each part its own bubble position,
+  size and look (or hide the camera) — because the right spot depends on what's behind you.
+- **Export** the edited project to a finished MP4 (with progress and cancel).
 - Pick the **screen**, **camera** (built-in FaceTime HD, USB webcam, iPhone Continuity Camera…)
   and **microphone** (with a live level meter). Device lists update when you plug things in.
 - Style the bubble like Loom / Screen Studio: **circle, squircle, portrait or landscape**
@@ -17,7 +26,9 @@ built with CMake. Runs on **macOS, Windows and Linux** from the same code.
 - The window can **hide while recording**; control it from the **menu-bar / tray icon** or
   with **⌘⇧R / Ctrl+Shift+R** (start/stop) and **⌘⇧P / Ctrl+Shift+P** (pause).
 - Output: **MP4 (H.264 + AAC)** — plays in QuickTime, Windows, browsers and phones.
-  Files are named `ScreenCam 2026-11-12 at 18.42.05.mp4`.
+  Screen-only and camera-only recordings are written straight to
+  `ScreenCam 2026-11-12 at 18.42.05.mp4`; Screen + Camera recordings become
+  `ScreenCam 2026-11-12 at 18.42.05.screencam` projects (see *Editing and export*).
 
 ---
 
@@ -48,6 +59,15 @@ Requirements: **Qt 6.8 or newer** with **Qt Multimedia and its FFmpeg backend**,
 > Check: your Qt's `plugins/multimedia/` must contain `libffmpegmediaplugin.*`
 > (`ffmpegmediaplugin.dll` on Windows), not only `libdarwinmediaplugin.dylib`.
 
+**Export needs the FFmpeg development files (optional).** The exporter talks to FFmpeg's
+libraries directly (`libavformat`, `libavcodec`, `libavutil`, `libswscale`), so it needs their
+*headers*, which Qt does not ship. CMake looks in `-DFFMPEG_DIR=<prefix>` (or the `FFMPEG_DIR`
+environment variable), then `~/.local/ffmpeg-*` (where `scripts/build-qt-ffmpeg.sh` installs
+it), then pkg-config and the system paths. The configure output says
+`Video export: ON (FFmpeg …)` or `OFF`; without it the app still records and edits, and the
+Export button explains what's missing. Prefer the **same FFmpeg major version** as Qt's
+multimedia plugin (7.x for Qt 6.8–6.10), so only one copy of FFmpeg ends up in the app.
+
 ### macOS
 
 Install Qt 6.8+ for macOS **with Qt Multimedia** using the Qt Online Installer, then:
@@ -77,6 +97,12 @@ cmake --build . --parallel && cmake --install .
 Afterwards `/usr/local/Qt-6.10.0/plugins/multimedia/` contains `libffmpegmediaplugin.dylib`.
 Re-run CMake for ScreenCam (`rm -rf build && cmake --preset release`).
 
+`scripts/build-qt-ffmpeg.sh` does all of this for you (FFmpeg into `~/.local/ffmpeg-<ver>`,
+then Qt Multimedia against it) — and because that FFmpeg includes its headers, **export is
+enabled automatically**: Qt and ScreenCam share the same FFmpeg. With Homebrew's FFmpeg
+instead, pass `-DFFMPEG_DIR="$(brew --prefix ffmpeg@7)"`. On macOS the export uses the
+hardware H.264 encoder (VideoToolbox), so it's fast and FFmpeg needs no extra codecs.
+
 **Permissions (do this once).** macOS remembers Camera / Microphone / Screen Recording
 permission per *code signature*. An ad-hoc signature changes with every build, so macOS would
 forget the permission after each rebuild. Create a fixed signing identity once:
@@ -98,8 +124,12 @@ launched from a terminal, macOS checks the *terminal's* permission instead of Sc
 Install Visual Studio 2022 (C++ workload) and Qt 6.8+ for *MSVC 2022 64-bit* with
 *Qt Multimedia* (Qt Online Installer). In an **x64 Native Tools Command Prompt**:
 
+For export, download an FFmpeg 7 **shared** build that includes `include/` and `lib/`
+(e.g. the "full_build-shared" archive from gyan.dev or a BtbN "shared" build), unpack it to
+`C:/ffmpeg` and add `-DFFMPEG_DIR=C:/ffmpeg`. Exports use the Media Foundation H.264 encoder.
+
 ```bat
-cmake --preset release -DCMAKE_PREFIX_PATH=C:/Qt/6.8.3/msvc2022_64
+cmake --preset release -DCMAKE_PREFIX_PATH=C:/Qt/6.8.3/msvc2022_64 -DFFMPEG_DIR=C:/ffmpeg
 cmake --build --preset release
 cmake --install build/release --prefix "%LOCALAPPDATA%/Programs/ScreenCam"
 ```
@@ -109,6 +139,9 @@ cmake --install build/release --prefix "%LOCALAPPDATA%/Programs/ScreenCam"
 Use Qt 6.8+ from the Qt Online Installer (includes FFmpeg). Distro packages work only if they
 ship the FFmpeg multimedia plugin (`libffmpegmediaplugin.so`); Ubuntu 24.04's Qt 6.4 is too old.
 
+For export: `sudo apt install libavformat-dev libavcodec-dev libswscale-dev` (Debian/Ubuntu)
+or your distribution's `ffmpeg-devel`. The export uses libx264 when that FFmpeg has it.
+
 ```bash
 cmake --preset release -DCMAKE_PREFIX_PATH=$HOME/Qt/6.8.3/gcc_64
 cmake --build --preset release
@@ -117,6 +150,48 @@ cmake --install build/release --prefix ~/.local     # adds a launcher + icon
 
 Screen capture on Linux goes through Qt's FFmpeg backend; on a **Wayland** session it may not
 be able to capture the screen with Qt 6.8 — use an X11 session if the preview stays black.
+Linux has no way for an app to hide its own windows from a screen capture, so there the
+floating bubble and control bar are visible in full-screen recordings (record a window or a
+region next to them to avoid that).
+
+---
+
+## Editing and export
+
+**Why a project instead of a video.** A finished video has the bubble burnt into it — to
+move it afterwards you'd have to record again. So a Screen + Camera recording keeps the two
+tracks separate:
+
+```
+ScreenCam 2026-11-12 at 18.42.05.screencam/
+├── screen.mp4     the screen / window / region, with your microphone
+├── camera.mp4     your camera, full frame, unmirrored, no audio
+└── project.json   the timeline: where the bubble is, and how it looks, from when to when
+```
+
+Both files are recorded at the same time by two `RecordingPipeline`s. Their clocks start a few
+milliseconds apart; that difference is stored as `cameraOffsetMs` (camera time = video time −
+offset) so the editor and the exporter line them up. If lips and voice still look off, the
+editor's *Camera sync* slider nudges it.
+
+**The editor** opens by itself when a recording ends (or *Open project…* / *Edit recording*,
+or `ScreenCam --open My.screencam`):
+
+- The timeline is a list of **parts** (segments). Each starts where you split and lasts until
+  the next split. Press **S** (or *Split here*) where the background changes, then drag
+  yourself in the preview — that moves the camera *for this part only*. A new part starts with
+  the look of the one it was cut from.
+- The right panel edits the part under the playhead: shape, size, roundness, border, shadow,
+  mirror, quick corner positions, *Show camera in this part*, *Use this look for all parts*.
+- **Delete** removes a part; its neighbour takes over its time. Changes save automatically.
+- Keys: **Space** play/pause · **S** split · **⌫** delete part · **← →** ±1 s · **Home** start.
+
+**Export** writes `<project name>.mp4` next to the project folder (exporting again replaces
+it). It decodes both files, paints every frame with the *same* `FrameCompositor` the recorder
+uses (so the exported bubble is pixel-for-pixel what you placed), encodes H.264
+(VideoToolbox on macOS, Media Foundation on Windows, libx264 / OpenH264 where available, MPEG-4
+as a last resort) and copies the microphone audio as-is. It runs in the background, faster
+than real time on most machines; a canceled export leaves no file behind.
 
 ### Packages and CI
 
@@ -135,7 +210,16 @@ cmake --workflow --preset default        # configure + build + test (Debug, in b
 | `core_tests` | sizes, bubble geometry, snapping, crop, NV12 colours, meter maths |
 | `tst_compositor` | pixels: circle mask, border, mirror, crop, NV12 format, pause-aware timestamps |
 | `tst_pipeline` | a real MP4 is written: duration excludes the pause, 640×360, decoded colours correct |
+| `tst_project` | timeline rules (split, delete, order) and `project.json` round trip |
+| `tst_media_backend` | detection of a Qt without the FFmpeg multimedia backend |
+| `make_sample_project` | (fixture) records a 3-second synthetic project for the tests below |
+| `tst_project_editor` | per-part styles, selection isn't an edit, autosave, export path |
+| `tst_export` | exported MP4 has the bubble where each part puts it, hidden camera, cancel, worker thread |
 | `ui_smoke` | the whole QML UI loads headless with **zero** QML warnings (`ScreenCam --self-test`) |
+| `ui_smoke_editor` | the editor loads the sample project with zero QML warnings |
+
+`ScreenCam --self-test --screenshot shot.png` also saves a picture of the window, and
+`make_sample_project ~/Desktop/Test.screencam 5` gives you a project to try the editor with.
 
 clangd (Neovim) picks up `build/compile_commands.json` from the `default` preset; `.clang-format` matches the style.
 
@@ -144,6 +228,9 @@ clangd (Neovim) picks up `build/compile_commands.json` from the `default` preset
 ## How it works
 
 ### The big picture
+
+While recording (Screen-only / Camera-only write one composited MP4 like this; Screen + Camera
+runs two of these pipelines — screen-only and camera-only — into a project):
 
 ```
  QScreenCapture ─► QVideoSink ─┬─► QML preview (VideoOutput)            CaptureSources
@@ -159,16 +246,18 @@ clangd (Neovim) picks up `build/compile_commands.json` from the `default` preset
                        QMediaRecorder  →  MP4 (H.264 + AAC)
 ```
 
-### Why the bubble is *composited*, not a floating window
+### Why a floating bubble *and* separate tracks
 
-The macOS-only first version (tag `archive/macos-native`) put the camera in a real
-always-on-top window and simply recorded the screen. That doesn't port: hiding the control
-window from the capture is OS-specific, and Wayland doesn't even let apps position windows.
-So now the screen and camera are captured **separately** and painted together:
+The camera bubble you see while recording is a real always-on-top window, so you can see
+yourself and drag it out of the way of what you're showing. But it is **not** recorded as
+part of the screen: ScreenCam's windows are excluded from capture (`NSWindowSharingNone` on
+macOS, `WDA_EXCLUDEFROMCAPTURE` on Windows — `WindowTools`), and the camera is recorded on its
+own track. Its position when you stopped becomes the first part's position in the editor;
+the final picture is composited at export time. That gives you:
 
-- the preview in the app shows exactly the final framing (same geometry code, see below),
-- you can restyle or drag the bubble mid-recording and the video follows,
-- Camera-only mode is just another layout of the same compositor.
+- no "screen inside the screen" loop in the preview,
+- a bubble you can still move, resize and restyle per part after recording,
+- one compositor (`FrameCompositor`) for live recordings and exports alike.
 
 ### Two experiments that shaped the encoder path
 
@@ -186,11 +275,12 @@ So now the screen and camera are captured **separately** and painted together:
 ```
 src/core/    pure C++20, no Qt — maths only, unit-tested anywhere
 src/media/   Qt Gui + Multimedia, no QML — compositing and encoding (tested headless)
-src/app/     QML-facing singletons: settings, devices, capture, recorder
+src/export/  FFmpeg (libav*) — decode + composite + encode a project (optional)
+src/app/     QML-facing objects: settings, devices, capture, recorder, editor
 qml/         the UI (Basic style + Theme.qml, identical on every OS)
 ```
 
-Dependencies point downwards only: `qml → app → media → core`.
+Dependencies point downwards only: `qml → app → export → media → core`.
 
 ---
 
@@ -220,6 +310,9 @@ Dependencies point downwards only: `qml → app → media → core`.
 - **`AudioLevel`** — `peakToMeterLevel()` maps a sample peak to a dB-scaled 0..1 bar
   (-60 dBFS → 0, 0 dBFS → 1); `smoothMeterLevel()` makes it rise instantly and fall slowly.
 - **`TimeFormat`** — `formatElapsed()` → `00:42`, `1:02:03`.
+- **`Timeline`** — `segmentAt()`, `canSplitAt()` (cuts at least 0.5 s apart, not at the
+  ends), `insertionIndex()`: the rules every timeline edit goes through.
+- **`BubbleGeometry::aspectFitRect()`** — letterboxing a window/region into the canvas.
 
 ### `src/media/` — painting and encoding
 
@@ -246,8 +339,30 @@ Dependencies point downwards only: `qml → app → media → core`.
     `failed(message)`.
 - **`BubbleStyleSnapshot`** — a plain copy of the bubble style that is safe to hand to the
   compositor thread; `borderPixels()` scales the border with the canvas.
+- **`Project`** — the `.screencam` folder in memory: files, `cameraOffsetMs`, canvas size and
+  the `segments` (start time + bubble style + camera visible). `splitAt()` copies the current
+  part's look into the new one; `removeSegment()` gives the time to a neighbour;
+  `save()`/`load()` read and write `project.json` (and repair the order of hand-edited files).
 
-### `src/app/` — what QML talks to (all singletons)
+### `src/export/` — turning a project into a video (FFmpeg)
+
+- **`FFmpegUtil.hpp`** — `std::unique_ptr` owners for FFmpeg's C structs (every early
+  `return` frees them) and `errorText()` for readable errors.
+- **`VideoFileReader`** — decodes one file front to back. `imageAt(t)` returns the frame a
+  player would show at `t` (the latest one with timestamp ≤ t), so the exporter can step at a
+  steady 30 fps while the source frames came unevenly. Converts with `swscale`, honouring the
+  file's BT.601/709 tag and range.
+- **`ProjectExporter`** — `exportProject()` is the whole export, synchronously (tests call it
+  directly); `start()` runs it on a low-priority `QThread` and reports `progress`, `finished`,
+  `failed`, `canceled`.
+  - `openEncoder()` tries encoders best-first and keeps the first that opens.
+  - per frame: segment at `t` → `FrameCompositor::setBubble()`, screen at `t`, camera at
+    `t − cameraOffsetMs` → `renderCanvas()` → `fillFrame()` (NV12, or split into YUV420P).
+  - `AudioCopy::writeUntil()` copies AAC packets up to the current video time, so audio and
+    video stay interleaved in the file.
+  - `Muxer` writes to `<name>.mp4.part` and renames it only when everything succeeded.
+
+### `src/app/` — what QML talks to
 
 - **`DeviceCatalog`** (`Devices`) — cameras/microphones/screens as `{id, name}` lists (with a
   "None" entry), refreshed on hot-plug; `requestPermissions()` (camera, then mic);
@@ -270,8 +385,16 @@ Dependencies point downwards only: `qml → app → media → core`.
   keeps inputs alive; `beginRecording()` hides the window (with a short delay so the minimize
   animation isn't recorded), snapshots settings into a pipeline request and starts it;
   bubble edits during recording are forwarded live; `nextOutputPath()` names files.
+- **`ProjectEditor`** (QML type, one per open project) — the editor's model. The part under
+  the playhead is exposed as `style`, an ordinary (non-persistent) `BubbleStyle`, so the same
+  bubble UI that edits the recording defaults edits a part; `onStyleEdited()` copies changes
+  back (and `loadCurrentStyle()` uses a flag so *selecting* a part isn't mistaken for an
+  edit). Autosaves 0.6 s after the last change. `exportVideo()` / `cancelExport()` /
+  `playLastExport()` drive the exporter when it was built.
+- **`WindowTools`** — `excludeFromCapture(window)` (macOS in `WindowTools_mac.mm`).
 - **`main.cpp`** — `QApplication` (the tray icon needs Widgets on Windows/Linux), Basic
-  style, window icon, and `--self-test` (load the UI, exit non-zero on QML warnings).
+  style, window icon, `--open <project>`, and `--self-test [--screenshot file]` (load the UI,
+  exit non-zero on QML warnings).
 
 ### `qml/`
 
@@ -283,6 +406,13 @@ Dependencies point downwards only: `qml → app → media → core`.
   shape's edge crosses the diagonal (`radius × (1 − 1/√2)` in from the corner).
 - **`SettingsPanel.qml`, `BubbleSection.qml`** — the sidebar. **`ControlBar.qml`** — record
   button, timer (tabular digits so it doesn't jiggle), pause/stop, play last recording.
+- **`FloatingBubble.qml`, `MiniControlBar.qml`, `RegionSelector.qml`** — the desktop bubble
+  window, the floating recording controls, and the full-screen rubber band for regions.
+- **`EditorPage.qml`** — two `MediaPlayer`s: screen (with audio) is the master clock; the
+  camera follows at `position − cameraOffsetMs`, re-synced on every seek/play/pause and when
+  it drifts more than 120 ms. The bubble is the same `CameraBubble` as the recorder, fed by
+  the camera player. **`EditorTimeline.qml`** — parts, playhead, ticks, click/drag to scrub.
+  **`EditorInspector.qml`** — the part's settings (reuses `BubbleSection`).
 - **`components/`** — themed controls. `StyledComboBox` re-binds `currentIndex` after a pick,
   because a ComboBox assigns its own index on click and would otherwise break the binding to
   the setting.
@@ -302,6 +432,10 @@ Dependencies point downwards only: `qml → app → media → core`.
 - **Log lines `Packet with invalid duration … in stream 0`** — printed by FFmpeg's MP4 muxer
   for B-frames that Qt 6.8 doesn't give a duration. Harmless: `tst_pipeline` checks that
   frame times increase and the file plays with the right duration.
+- **"This build of ScreenCam can't export"** — CMake didn't find the FFmpeg development
+  files; see *Export needs the FFmpeg development files* and re-configure with `-DFFMPEG_DIR`.
+- **Exported video's camera is slightly out of sync with your voice** — use *Camera sync* in
+  the editor's *Project* section, then export again.
 - **High CPU at 4K / 60 fps** — painting and colour conversion run on the CPU; 1080p/30 is
   light, 4K/60 is demanding on older machines.
 
