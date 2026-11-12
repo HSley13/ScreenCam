@@ -99,9 +99,11 @@ if(SCREENCAM_BUILD_APP)
         # Whoever links the exporter (the app, tests) gets the define that turns export on.
         target_compile_definitions(screencam_export PUBLIC SCREENCAM_HAS_EXPORT)
         message(STATUS "Video export: ON (FFmpeg ${FFmpeg_VERSION} in ${FFmpeg_INCLUDE_DIR})")
-    else()
+    elseif(SCREENCAM_ENABLE_EXPORT)
         message(STATUS "Video export: OFF - FFmpeg development files not found. "
                        "Pass -DFFMPEG_DIR=<prefix> (see README > Export) to enable it.")
+    else()
+        message(STATUS "Video export: OFF (SCREENCAM_ENABLE_EXPORT=OFF)")
     endif()
 
     if(SCREENCAM_BUILD_TESTS)
