@@ -16,3 +16,6 @@ compile_commands.json
 
 # Personal CMake presets (e.g. your Qt path)
 CMakeUserPresets.json
+
+# Third-party sources/builds made by scripts/ (safe to delete)
+.deps/
