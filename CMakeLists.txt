@@ -161,4 +161,49 @@ if(SCREENCAM_BUILD_APP)
         PREFIX "/screencam"
         BASE "packaging/icons"
         FILES packaging/icons/screencam.png)
+
+    # -----------------------------------------------------------------------
+    # Install + deploy:  cmake --install build --prefix <dir>
+    # Produces a self-contained app: Qt libraries, plugins (incl. the FFmpeg
+    # multimedia backend) and QML modules are copied next to the executable by
+    # Qt's deploy tooling (macdeployqt / windeployqt / Linux deploy).
+    # -----------------------------------------------------------------------
+    include(GNUInstallDirs)
+    install(TARGETS ScreenCam
+        BUNDLE DESTINATION .
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+    qt_generate_deploy_qml_app_script(
+        TARGET ScreenCam
+        OUTPUT_SCRIPT screencam_deploy_script
+        NO_UNSUPPORTED_PLATFORM_ERROR)
+    install(SCRIPT ${screencam_deploy_script})
+
+    if(APPLE)
+        # Deployment rewrites the binaries, which breaks their signature; re-sign ad hoc so
+        # macOS accepts the bundle and remembers its camera/mic/screen permissions.
+        install(CODE [[
+            execute_process(COMMAND codesign --force --deep --sign - "${CMAKE_INSTALL_PREFIX}/ScreenCam.app")
+        ]])
+    elseif(UNIX)
+        install(FILES packaging/linux/screencam.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+        install(FILES packaging/icons/screencam.png
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/512x512/apps)
+    endif()
+
+    # Packages:  cmake --build build --target package
+    #   macOS -> .dmg (drag to Applications), Windows -> .zip, Linux -> .tar.gz
+    set(CPACK_PACKAGE_NAME "ScreenCam")
+    set(CPACK_PACKAGE_VENDOR "hsley13")
+    set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
+    set(CPACK_PACKAGE_FILE_NAME "ScreenCam-${PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}")
+    if(APPLE)
+        set(CPACK_GENERATOR "DragNDrop")
+    elseif(WIN32)
+        set(CPACK_GENERATOR "ZIP")
+    else()
+        set(CPACK_GENERATOR "TGZ")
+    endif()
+    include(CPack)
 endif()
