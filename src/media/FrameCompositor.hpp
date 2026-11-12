@@ -5,6 +5,7 @@
 #include <QElapsedTimer>
 #include <QImage>
 #include <QObject>
+#include <QRectF>
 #include <QSize>
 #include <QVideoFrame>
 
@@ -20,6 +21,9 @@ enum class CompositeLayout {
 
 struct CompositorConfig {
     QSize canvasSize;  // output video size in pixels
+    // Part of the screen frame to record, normalized (0..1). The whole frame by default; a
+    // smaller rectangle records just a region of the screen.
+    QRectF sourceCrop{0.0, 0.0, 1.0, 1.0};
     CompositeLayout layout = CompositeLayout::ScreenWithBubble;
     int framesPerSecond = 30;
     BubbleStyleSnapshot bubble;
@@ -70,6 +74,7 @@ private:
     void tick();
     void refreshImages();
     void drawCamera(QPainter &painter, const QRectF &target, bool mirrored) const;
+    void drawScreen(QPainter &painter, const QRectF &canvas) const;
     void drawBubble(QPainter &painter);
     const QImage &shadowFor(const QSize &bubbleSize, double radius);
     const QImage &maskFor(const QSize &bubbleSize, double radius);

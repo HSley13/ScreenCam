@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QObject>
+#include <QRect>
 #include <QSettings>
 #include <QUrl>
 #include <QVariantList>
@@ -18,6 +19,9 @@ class RecordingSettings : public QObject {
 
     Q_PROPERTY(CaptureMode mode READ mode WRITE setMode NOTIFY modeChanged)
     Q_PROPERTY(QString screenId READ screenId WRITE setScreenId NOTIFY screenIdChanged)
+    Q_PROPERTY(CaptureTarget captureTarget READ captureTarget WRITE setCaptureTarget NOTIFY captureTargetChanged)
+    // Region to record, in the selected screen's logical coordinates (empty = none chosen yet).
+    Q_PROPERTY(QRect region READ region WRITE setRegion NOTIFY regionChanged)
     Q_PROPERTY(QString cameraId READ cameraId WRITE setCameraId NOTIFY cameraIdChanged)
     Q_PROPERTY(QString microphoneId READ microphoneId WRITE setMicrophoneId NOTIFY microphoneIdChanged)
     Q_PROPERTY(int resolution READ resolution WRITE setResolution NOTIFY resolutionChanged)
@@ -39,6 +43,14 @@ public:
     };
     Q_ENUM(CaptureMode)
 
+    /// Which part of the desktop is recorded.
+    enum class CaptureTarget {
+        Screen,  // a whole display: every app on it
+        Window,  // one application window
+        Region,  // a rectangle you drag out on a display
+    };
+    Q_ENUM(CaptureTarget)
+
     /// Mirrors screencam::core::CameraOrientation (same values) for QML.
     enum class Orientation {
         Landscape,
@@ -53,6 +65,10 @@ public:
     void setMode(CaptureMode mode);
     QString screenId() const { return m_screenId; }
     void setScreenId(const QString &id);
+    CaptureTarget captureTarget() const { return m_captureTarget; }
+    void setCaptureTarget(CaptureTarget target);
+    QRect region() const { return m_region; }
+    void setRegion(const QRect &region);
     QString cameraId() const { return m_cameraId; }
     void setCameraId(const QString &id);
     QString microphoneId() const { return m_microphoneId; }
@@ -82,6 +98,8 @@ public:
 signals:
     void modeChanged();
     void screenIdChanged();
+    void captureTargetChanged();
+    void regionChanged();
     void cameraIdChanged();
     void microphoneIdChanged();
     void resolutionChanged();
@@ -101,6 +119,8 @@ private:
     QSettings m_store;
     CaptureMode m_mode = CaptureMode::ScreenAndCamera;
     QString m_screenId;
+    CaptureTarget m_captureTarget = CaptureTarget::Screen;
+    QRect m_region;
     QString m_cameraId;
     QString m_microphoneId;
     int m_resolution = 1;  // FullHD1080

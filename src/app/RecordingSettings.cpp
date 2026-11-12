@@ -55,6 +55,8 @@ RecordingSettings::RecordingSettings(QObject *parent)
 
     m_mode = static_cast<CaptureMode>(m_store.value("mode", static_cast<int>(m_mode)).toInt());
     m_screenId = m_store.value("screen", DeviceCatalog::idOf(QGuiApplication::primaryScreen())).toString();
+    m_captureTarget = static_cast<CaptureTarget>(m_store.value("captureTarget", static_cast<int>(m_captureTarget)).toInt());
+    m_region = m_store.value("region", QRect()).toRect();
     m_cameraId = m_store.value("camera", defaultCamera).toString();
     m_microphoneId = m_store.value("microphone", defaultMicrophone).toString();
     m_resolution = m_store.value("resolution", m_resolution).toInt();
@@ -82,6 +84,14 @@ void RecordingSettings::setMode(CaptureMode mode) {
 
 void RecordingSettings::setScreenId(const QString &id) {
     assign(m_screenId, id, "screen", &RecordingSettings::screenIdChanged);
+}
+
+void RecordingSettings::setCaptureTarget(CaptureTarget target) {
+    assign(m_captureTarget, target, "captureTarget", &RecordingSettings::captureTargetChanged);
+}
+
+void RecordingSettings::setRegion(const QRect &region) {
+    assign(m_region, region.normalized(), "region", &RecordingSettings::regionChanged);
 }
 
 void RecordingSettings::setCameraId(const QString &id) {

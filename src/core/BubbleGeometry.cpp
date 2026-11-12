@@ -152,4 +152,14 @@ RectD aspectFillCrop(SizeD source, double targetAspect) {
     return {0.0, (source.height - height) / 2.0, source.width, height};
 }
 
+RectD aspectFitRect(SizeD source, SizeD target) {
+    if (source.width <= 0.0 || source.height <= 0.0 || target.width <= 0.0 || target.height <= 0.0) {
+        return {};
+    }
+    const double scale = std::min(target.width / source.width, target.height / source.height);
+    const double width = source.width * scale;
+    const double height = source.height * scale;
+    return {(target.width - width) / 2.0, (target.height - height) / 2.0, width, height};
+}
+
 }  // namespace screencam::core

@@ -81,11 +81,18 @@ Rectangle {
             Behavior on width { NumberAnimation { duration: Theme.animationNormal; easing.type: Easing.OutCubic } }
             Behavior on height { NumberAnimation { duration: Theme.animationNormal; easing.type: Easing.OutCubic } }
 
+            // For a region, the full screen is drawn larger than the canvas and shifted so only
+            // the selected part shows (the canvas clips the rest).
             VideoOutput {
                 id: screenView
-                anchors.fill: parent
+                readonly property rect crop: Capture.sourceCrop
+                x: crop.width > 0 ? -crop.x / crop.width * canvas.width : 0
+                y: crop.height > 0 ? -crop.y / crop.height * canvas.height : 0
+                width: crop.width > 0 ? canvas.width / crop.width : canvas.width
+                height: crop.height > 0 ? canvas.height / crop.height : canvas.height
                 visible: !stage.cameraOnly
-                fillMode: VideoOutput.Stretch  // the canvas already has the screen's aspect ratio
+                fillMode: RecordingSettings.captureTarget === RecordingSettings.Window
+                          ? VideoOutput.PreserveAspectFit : VideoOutput.Stretch
 
                 Component.onCompleted: Capture.addScreenPreview(videoSink)
                 Component.onDestruction: Capture.removeScreenPreview(videoSink)

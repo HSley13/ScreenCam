@@ -70,4 +70,8 @@ PointD snapNormalizedCenter(SizeD canvas, SizeD bubble, PointD normalizedCenter,
 /// Used to crop the camera image so it fills the bubble without being stretched.
 RectD aspectFillCrop(SizeD source, double targetAspect);
 
+/// The largest rectangle with `source`'s aspect ratio that fits inside `target`, centred
+/// (letterboxing). Used when a captured window's shape differs from the video's.
+RectD aspectFitRect(SizeD source, SizeD target);
+
 }  // namespace screencam::core
