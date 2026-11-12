@@ -81,6 +81,7 @@ if(SCREENCAM_BUILD_APP)
         src/app/BubbleStyle.cpp src/app/BubbleStyle.hpp
         src/app/CaptureSources.cpp src/app/CaptureSources.hpp
         src/app/DeviceCatalog.cpp src/app/DeviceCatalog.hpp
+        src/app/RecordingController.cpp src/app/RecordingController.hpp
         src/app/RecordingSettings.cpp src/app/RecordingSettings.hpp
     )
     set(SCREENCAM_QML_FILES
