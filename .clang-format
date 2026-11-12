@@ -1,0 +1,20 @@
+# Used by conform.nvim / clang-format. Matches the style of the existing sources.
+BasedOnStyle: LLVM
+Language: Cpp
+Standard: c++20
+IndentWidth: 4
+ColumnLimit: 120
+AccessModifierOffset: -4
+PointerAlignment: Right
+NamespaceIndentation: None
+FixNamespaceComments: true
+# Braces on every if/for/while, even one-liners.
+InsertBraces: true
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Never
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortLambdasOnASingleLine: Empty
+BreakConstructorInitializers: BeforeComma
+IncludeBlocks: Preserve
+SortIncludes: CaseSensitive
