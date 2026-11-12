@@ -1,0 +1,2 @@
+// Windows resource script: gives ScreenCam.exe its icon in Explorer and the taskbar.
+IDI_ICON1 ICON "ScreenCam.ico"

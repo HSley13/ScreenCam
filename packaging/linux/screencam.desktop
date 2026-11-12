@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=ScreenCam
+GenericName=Screen Recorder
+Comment=Record your screen with a draggable camera bubble
+Exec=ScreenCam
+Icon=screencam
+Terminal=false
+Categories=AudioVideo;Video;Recorder;
+Keywords=screen;recorder;camera;webcam;capture;

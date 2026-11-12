@@ -107,7 +107,16 @@ if(SCREENCAM_BUILD_APP)
     )
     set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
-    qt_add_executable(ScreenCam WIN32 MACOSX_BUNDLE src/app/main.cpp)
+    # Platform icons: .icns inside the macOS bundle, .rc/.ico for the Windows .exe.
+    set(SCREENCAM_PLATFORM_FILES)
+    if(APPLE)
+        set(SCREENCAM_PLATFORM_FILES ${CMAKE_CURRENT_SOURCE_DIR}/packaging/macos/ScreenCam.icns)
+        set_source_files_properties(${SCREENCAM_PLATFORM_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+    elseif(WIN32)
+        set(SCREENCAM_PLATFORM_FILES ${CMAKE_CURRENT_SOURCE_DIR}/packaging/windows/ScreenCam.rc)
+    endif()
+
+    qt_add_executable(ScreenCam WIN32 MACOSX_BUNDLE src/app/main.cpp ${SCREENCAM_PLATFORM_FILES})
     qt_add_qml_module(ScreenCam
         URI ScreenCam
         VERSION 1.0
@@ -138,5 +147,12 @@ if(SCREENCAM_BUILD_APP)
         MACOSX_BUNDLE_GUI_IDENTIFIER "com.hsley13.screencam"
         MACOSX_BUNDLE_BUNDLE_NAME "ScreenCam"
         MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
-        MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}")
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_ICON_FILE "ScreenCam.icns")
+
+    # Window/taskbar icon at runtime (all platforms).
+    qt_add_resources(ScreenCam "screencam_icon"
+        PREFIX "/screencam"
+        BASE "packaging/icons"
+        FILES packaging/icons/screencam.png)
 endif()

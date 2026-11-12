@@ -1,5 +1,6 @@
 // Entry point: create the application, pick a style, load the QML front end.
 #include <QApplication>
+#include <QIcon>
 #include <QQmlApplicationEngine>
 #include <QQuickStyle>
 
@@ -12,6 +13,7 @@ int main(int argc, char *argv[]) {
     QApplication::setApplicationName("ScreenCam");
     QApplication::setApplicationDisplayName("ScreenCam");
     QApplication::setApplicationVersion(SCREENCAM_VERSION);
+    QApplication::setWindowIcon(QIcon(QStringLiteral(":/screencam/screencam.png")));
 
     // "Basic" is the fully customizable Qt Quick Controls style: it looks identical on every OS,
     // whereas native styles (macOS, Windows) ignore most custom backgrounds/colours.
