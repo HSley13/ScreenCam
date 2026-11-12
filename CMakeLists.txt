@@ -62,6 +62,18 @@ if(SCREENCAM_BUILD_APP)
     target_link_libraries(screencam_media PUBLIC screencam_core Qt6::Gui Qt6::Multimedia)
     target_compile_options(screencam_media PRIVATE ${SCREENCAM_WARNINGS})
 
+    if(SCREENCAM_BUILD_TESTS)
+        find_package(Qt6 REQUIRED COMPONENTS Test)
+        # Media tests run without a display (offscreen platform) so they also work in CI.
+        function(screencam_add_qt_test name)
+            qt_add_executable(${name} tests/${name}.cpp)
+            target_link_libraries(${name} PRIVATE screencam_media Qt6::Test)
+            add_test(NAME ${name} COMMAND ${name})
+            set_tests_properties(${name} PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+        endfunction()
+        screencam_add_qt_test(tst_compositor)
+    endif()
+
     set(SCREENCAM_APP_SOURCES
         src/app/AudioLevelMeter.cpp src/app/AudioLevelMeter.hpp
         src/app/BubbleStyle.cpp src/app/BubbleStyle.hpp
