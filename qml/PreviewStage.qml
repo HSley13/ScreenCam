@@ -129,16 +129,6 @@ Rectangle {
                     font.pixelSize: 14
                 }
 
-                Label {
-                    width: parent.width
-                    horizontalAlignment: Text.AlignHCenter
-                    wrapMode: Text.WordWrap
-                    visible: !stage.cameraOnly && Capture.screenError.length > 0
-                    text: qsTr("On macOS, allow ScreenCam under System Settings ▸ Privacy & Security ▸ Screen Recording, then reopen it.")
-                    color: Theme.textMuted
-                    font.pixelSize: 12
-                    opacity: 0.8
-                }
             }
 
             // Safe-area outline + centre lines while dragging: the snap targets.
