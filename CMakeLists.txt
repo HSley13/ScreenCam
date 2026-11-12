@@ -86,6 +86,7 @@ if(SCREENCAM_BUILD_APP)
         endfunction()
         screencam_add_qt_test(tst_compositor)
         screencam_add_qt_test(tst_pipeline)
+        screencam_add_qt_test(tst_media_backend)
     endif()
 
     set(SCREENCAM_APP_SOURCES
