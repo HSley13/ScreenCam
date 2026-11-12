@@ -16,30 +16,31 @@ ApplicationWindow {
     // macOS asks for camera/microphone access the first time; elsewhere this is a no-op.
     Component.onCompleted: Devices.requestPermissions()
 
+    // Run the live inputs only while the window can actually be seen.
+    Binding {
+        target: Capture
+        property: "previewEnabled"
+        value: window.visible && window.visibility !== Window.Minimized
+    }
+
     RowLayout {
         anchors.fill: parent
         anchors.margins: 16
         spacing: 16
 
-        // Preview stage (filled in by the live-preview feature).
-        Rectangle {
+        PreviewStage {
+            id: stage
             Layout.fillWidth: true
             Layout.fillHeight: true
-            radius: Theme.radius
-            color: Theme.surface
-            border.color: Theme.stroke
-
-            Label {
-                anchors.centerIn: parent
-                text: qsTr("ScreenCam")
-                color: Theme.textMuted
-                font.pixelSize: 22
-            }
         }
 
         SettingsPanel {
             Layout.preferredWidth: Theme.sidebarWidth
             Layout.fillHeight: true
+
+            BubbleSection {
+                canvasSize: stage.canvasSize
+            }
         }
     }
 }

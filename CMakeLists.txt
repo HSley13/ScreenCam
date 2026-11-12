@@ -62,7 +62,9 @@ if(SCREENCAM_BUILD_APP)
     )
     set(SCREENCAM_QML_FILES
         qml/BubbleSection.qml
+        qml/CameraBubble.qml
         qml/Main.qml
+        qml/PreviewStage.qml
         qml/SettingsPanel.qml
         qml/Theme.qml
         qml/components/Field.qml
