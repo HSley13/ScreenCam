@@ -2,9 +2,18 @@
 
 #import <AVFoundation/AVFoundation.h>
 
+#import "platform/CameraCapture.h"
+#import "platform/DeviceCatalog.h"
+#import "ui/CameraBubbleWindow.h"
 #import "ui/ControlPanelController.h"
 
 namespace {
+
+constexpr CGFloat kDefaultBubbleDiameter = 180.0;
+
+BOOL SameID(NSString *_Nullable a, NSString *_Nullable b) {
+    return (a == nil && b == nil) || [a isEqualToString:b];
+}
 
 /// Builds the menu bar in code (we don't use a .xib/.storyboard).
 /// Without an app menu there would be no ⌘Q and no "Quit" item.
@@ -51,10 +60,15 @@ void ActivateApp() {
 
 @implementation AppDelegate {
     ControlPanelController *_panel;
+    CameraCapture *_camera;        // one shared camera session (preview + recording frames)
+    CameraBubbleWindow *_bubble;   // the circle you drag around
 }
 
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
     NSApp.mainMenu = BuildMainMenu();
+
+    _camera = [[CameraCapture alloc] init];
+    _bubble = [[CameraBubbleWindow alloc] initWithPreviewLayer:_camera.previewLayer diameter:kDefaultBubbleDiameter];
 
     _panel = [[ControlPanelController alloc] init];
     _panel.delegate = self;
@@ -62,6 +76,7 @@ void ActivateApp() {
     ActivateApp();
 
     [self observeSystemChanges];
+    [self requestPermissions];
 }
 
 - (BOOL)applicationSupportsSecureRestorableState:(NSApplication *)app {
@@ -94,8 +109,66 @@ void ActivateApp() {
     [self applySelection];
 }
 
-/// Applies the panel's current choices. Filled in by later features (camera bubble, recording).
+#pragma mark - Permissions
+
+/// Asks for camera, then microphone access (one prompt at a time), then reports what's missing.
+/// macOS only shows each prompt once; after a "Don't Allow" the user must use System Settings.
+- (void)requestPermissions {
+    __weak AppDelegate *weakSelf = self;
+    [AVCaptureDevice requestAccessForMediaType:AVMediaTypeVideo completionHandler:^(BOOL cameraGranted) {
+        [AVCaptureDevice requestAccessForMediaType:AVMediaTypeAudio completionHandler:^(BOOL micGranted) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [weakSelf permissionsResolvedCamera:cameraGranted microphone:micGranted];
+            });
+        }];
+    }];
+}
+
+- (void)permissionsResolvedCamera:(BOOL)cameraGranted microphone:(BOOL)micGranted {
+    NSMutableArray<NSString *> *missing = [NSMutableArray array];
+    if (!cameraGranted) {
+        [missing addObject:@"Camera"];
+    }
+    if (!micGranted) {
+        [missing addObject:@"Microphone"];
+    }
+    if (missing.count > 0) {
+        [_panel setStatusText:[NSString stringWithFormat:@"Allow %@ for ScreenCam in System Settings ▸ Privacy & Security.",
+                                                         [missing componentsJoinedByString:@" and "]]];
+    }
+    [self applySelection];
+}
+
+#pragma mark - Selection
+
+/// Makes the camera session and the bubble match the panel:
+///  - camera changed  -> switch the capture session (async),
+///  - camera "None"   -> hide the bubble,
+///  - screen changed  -> move the bubble onto that screen so it ends up in the recording.
 - (void)applySelection {
+    const BOOL cameraAllowed =
+        [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeVideo] == AVAuthorizationStatusAuthorized;
+    NSString *wantedCamera = cameraAllowed ? _panel.selectedCameraID : nil;
+
+    if (!SameID(wantedCamera, _camera.currentDeviceID)) {
+        __weak AppDelegate *weakSelf = self;
+        [_camera switchToDeviceWithUniqueID:wantedCamera completion:^(NSError *error) {
+            if (error != nil) {
+                [weakSelf showStatus:error.localizedDescription];
+            }
+        }];
+    }
+
+    if (wantedCamera != nil) {
+        [_bubble placeOnScreen:[DeviceCatalog screenForDisplayID:_panel.selectedDisplayID]];
+        [_bubble orderFrontRegardless];
+    } else {
+        [_bubble orderOut:nil];
+    }
+}
+
+- (void)showStatus:(NSString *)text {
+    [_panel setStatusText:text];
 }
 
 #pragma mark - ControlPanelDelegate
