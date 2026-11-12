@@ -54,6 +54,7 @@ if(SCREENCAM_BUILD_APP)
     qt_standard_project_setup(REQUIRES 6.8)
 
     set(SCREENCAM_APP_SOURCES
+        src/app/AudioLevelMeter.cpp src/app/AudioLevelMeter.hpp
         src/app/DeviceCatalog.cpp src/app/DeviceCatalog.hpp
     )
     set(SCREENCAM_QML_FILES
