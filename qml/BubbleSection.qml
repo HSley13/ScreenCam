@@ -3,12 +3,10 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 
-// Sidebar section "CAMERA": bubble look in Screen + Cam mode, framing in Camera-only mode.
+// Sidebar section "CAMERA": the bubble's look in Screen + Cam mode (the floating bubble and
+// the starting layout in the editor), framing in Camera-only mode.
 SidebarSection {
     id: section
-
-    // Canvas size of the preview, needed to place the bubble in a corner.
-    property size canvasSize: Qt.size(1920, 1080)
 
     readonly property bool bubbleMode: RecordingSettings.mode === RecordingSettings.ScreenAndCamera
     readonly property bool cameraOnly: RecordingSettings.mode === RecordingSettings.CameraOnly
@@ -131,36 +129,5 @@ SidebarSection {
         text: qsTr("Mirror camera")
         checked: BubbleStyle.mirrored
         onToggled: BubbleStyle.mirrored = checked
-    }
-
-    Field {
-        label: qsTr("Position")
-        hint: qsTr("or drag it on the preview")
-        visible: section.bubbleMode
-
-        GridLayout {
-            Layout.fillWidth: true
-            columns: 2
-            rowSpacing: 8
-            columnSpacing: 8
-
-            Repeater {
-                model: [
-                    { corner: BubbleStyle.TopLeft, label: qsTr("↖ Top left") },
-                    { corner: BubbleStyle.TopRight, label: qsTr("Top right ↗") },
-                    { corner: BubbleStyle.BottomLeft, label: qsTr("↙ Bottom left") },
-                    { corner: BubbleStyle.BottomRight, label: qsTr("Bottom right ↘") }
-                ]
-
-                delegate: StyledButton {
-                    required property var modelData
-
-                    Layout.fillWidth: true
-                    text: modelData.label
-                    onClicked: BubbleStyle.placeInCorner(modelData.corner, section.canvasSize.width,
-                                                         section.canvasSize.height)
-                }
-            }
-        }
     }
 }

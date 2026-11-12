@@ -13,6 +13,7 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QJSEngine>
+#include <QScreen>
 #include <QUrl>
 
 namespace core = screencam::core;
@@ -271,6 +272,28 @@ void RecordingController::openLastRecording() const {
     if (!m_lastRecording.isEmpty()) {
         QDesktopServices::openUrl(QUrl::fromLocalFile(m_lastRecording));
     }
+}
+
+void RecordingController::setBubbleDesktopCenter(const QPointF &center) {
+    m_bubbleDesktopCenter = center;
+}
+
+core::PointD RecordingController::bubbleCenterInTarget() const {
+    const core::PointD fallback{0.12, 0.84};  // bottom-left, like the floating bubble's start
+    const RecordingSettings *settings = RecordingSettings::instance();
+    const QScreen *screen = DeviceCatalog::findScreen(settings->screenId());
+    if (screen == nullptr || m_bubbleDesktopCenter.x() < 0.0 ||
+        settings->captureTarget() == RecordingSettings::CaptureTarget::Window) {
+        return fallback;
+    }
+    QRectF area = screen->geometry();
+    if (settings->captureTarget() == RecordingSettings::CaptureTarget::Region) {
+        area = QRectF(settings->region()).translated(screen->geometry().topLeft());
+    }
+    if (!area.contains(m_bubbleDesktopCenter) || area.isEmpty()) {
+        return fallback;
+    }
+    return {(m_bubbleDesktopCenter.x() - area.x()) / area.width(), (m_bubbleDesktopCenter.y() - area.y()) / area.height()};
 }
 
 void RecordingController::clearError() {

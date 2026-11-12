@@ -105,6 +105,7 @@ if(SCREENCAM_BUILD_APP)
         qml/ControlBar.qml
         qml/CountdownOverlay.qml
         qml/ErrorBanner.qml
+        qml/FloatingBubble.qml
         qml/Main.qml
         qml/PreviewStage.qml
         qml/RegionSelector.qml

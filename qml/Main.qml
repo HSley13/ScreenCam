@@ -54,14 +54,18 @@ ApplicationWindow {
             Layout.fillHeight: true
             locked: Recorder.busy
 
-            BubbleSection {
-                canvasSize: stage.canvasSize
-            }
+            BubbleSection {}
         }
     }
 
     CountdownOverlay {
         anchors.fill: parent
+    }
+
+    // Your camera, floating on the desktop (only in Screen + Camera mode).
+    FloatingBubble {
+        visible: RecordingSettings.mode === RecordingSettings.ScreenAndCamera
+                 && RecordingSettings.cameraId.length > 0 && Devices.cameraAllowed
     }
 
     function bringToFront() {

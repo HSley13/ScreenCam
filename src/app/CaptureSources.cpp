@@ -184,6 +184,15 @@ void CaptureSources::setPreviewEnabled(bool enabled) {
     updateCamera();
 }
 
+void CaptureSources::setBubbleVisible(bool visible) {
+    if (m_bubbleVisible == visible) {
+        return;
+    }
+    m_bubbleVisible = visible;
+    emit bubbleVisibleChanged();
+    updateCamera();
+}
+
 void CaptureSources::setRecordingActive(bool active) {
     if (m_recordingActive == active) {
         return;
@@ -311,7 +320,8 @@ void CaptureSources::releaseCamera() {
 
 void CaptureSources::updateCamera() {
     const RecordingSettings *settings = RecordingSettings::instance();
-    const bool wanted = settings->usesCamera() && wantsInputs() && DeviceCatalog::instance()->cameraAllowed();
+    const bool wanted = settings->usesCamera() && (wantsInputs() || m_bubbleVisible) &&
+                        DeviceCatalog::instance()->cameraAllowed();
     const std::optional<QCameraDevice> device = DeviceCatalog::findCamera(settings->cameraId());
 
     if (!wanted || !device) {

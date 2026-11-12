@@ -35,6 +35,8 @@ class CaptureSources : public QObject {
     QML_SINGLETON
 
     Q_PROPERTY(bool previewEnabled READ previewEnabled WRITE setPreviewEnabled NOTIFY previewEnabledChanged)
+    // The floating camera bubble is on screen: keep the camera (only) running for it.
+    Q_PROPERTY(bool bubbleVisible READ bubbleVisible WRITE setBubbleVisible NOTIFY bubbleVisibleChanged)
     Q_PROPERTY(bool screenActive READ screenActive NOTIFY screenActiveChanged)
     Q_PROPERTY(bool cameraActive READ cameraActive NOTIFY cameraActiveChanged)
     Q_PROPERTY(QString screenError READ screenError NOTIFY screenErrorChanged)
@@ -56,6 +58,8 @@ public:
 
     bool previewEnabled() const { return m_previewEnabled; }
     void setPreviewEnabled(bool enabled);
+    bool bubbleVisible() const { return m_bubbleVisible; }
+    void setBubbleVisible(bool visible);
     /// Keeps the inputs running while recording, even if the window is hidden.
     void setRecordingActive(bool active);
 
@@ -83,6 +87,7 @@ public:
 
 signals:
     void previewEnabledChanged();
+    void bubbleVisibleChanged();
     void screenActiveChanged();
     void cameraActiveChanged();
     void screenErrorChanged();
@@ -132,5 +137,6 @@ private:
 
     QString m_backendProblem;
     bool m_previewEnabled = false;
+    bool m_bubbleVisible = false;
     bool m_recordingActive = false;
 };
