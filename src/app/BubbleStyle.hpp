@@ -48,6 +48,10 @@ public:
     static BubbleStyle *instance();
     static BubbleStyle *create(QQmlEngine *qmlEngine, QJSEngine *jsEngine);
 
+    /// `persistent`: load/save with QSettings (the app-wide default look). The editor uses a
+    /// non-persistent instance for "the segment under the playhead".
+    explicit BubbleStyle(QObject *parent = nullptr, bool persistent = false);
+
     Shape shape() const { return static_cast<Shape>(m_style.shape); }
     void setShape(Shape shape);
     double size() const { return m_style.size; }
@@ -67,6 +71,8 @@ public:
     int revision() const { return m_revision; }
 
     BubbleStyleSnapshot snapshot() const { return m_style; }
+    /// Replaces everything at once (one styleChanged).
+    void setSnapshot(const BubbleStyleSnapshot &style);
 
     /// Bubble rectangle on a canvas of the given size (pixels of that canvas).
     Q_INVOKABLE QRectF rectFor(double canvasWidth, double canvasHeight) const;
@@ -85,10 +91,10 @@ signals:
     void styleChanged();
 
 private:
-    explicit BubbleStyle(QObject *parent = nullptr);
     void commit();  // persist + notify
     screencam::core::SizeD bubbleSizeOn(double canvasWidth, double canvasHeight) const;
 
+    bool m_persistent = false;
     QSettings m_store;
     BubbleStyleSnapshot m_style;
     int m_revision = 0;

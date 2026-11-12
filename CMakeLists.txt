@@ -97,6 +97,7 @@ if(SCREENCAM_BUILD_APP)
         src/app/BubbleStyle.cpp src/app/BubbleStyle.hpp
         src/app/CaptureSources.cpp src/app/CaptureSources.hpp
         src/app/DeviceCatalog.cpp src/app/DeviceCatalog.hpp
+        src/app/ProjectEditor.cpp src/app/ProjectEditor.hpp
         src/app/RecordingController.cpp src/app/RecordingController.hpp
         src/app/RecordingSettings.cpp src/app/RecordingSettings.hpp
         src/app/WindowTools.cpp src/app/WindowTools.hpp
@@ -107,6 +108,9 @@ if(SCREENCAM_BUILD_APP)
         qml/CameraBubble.qml
         qml/ControlBar.qml
         qml/CountdownOverlay.qml
+        qml/EditorInspector.qml
+        qml/EditorPage.qml
+        qml/EditorTimeline.qml
         qml/ErrorBanner.qml
         qml/FloatingBubble.qml
         qml/Main.qml
@@ -220,6 +224,25 @@ if(SCREENCAM_BUILD_APP)
         # Loads the whole QML UI headless and fails on any QML warning.
         add_test(NAME ui_smoke COMMAND ScreenCam --self-test)
         set_tests_properties(ui_smoke PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+        # The editor's model, built from the app sources it needs (they aren't a library).
+        qt_add_executable(tst_project_editor tests/tst_project_editor.cpp
+            src/app/ProjectEditor.cpp src/app/BubbleStyle.cpp)
+        target_include_directories(tst_project_editor PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        target_link_libraries(tst_project_editor PRIVATE screencam_media Qt6::Qml Qt6::Test)
+        add_test(NAME tst_project_editor COMMAND tst_project_editor)
+        set_tests_properties(tst_project_editor PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+        # Editor smoke test: record a tiny synthetic project first (fixture), then open it.
+        qt_add_executable(make_sample_project tests/make_sample_project.cpp)
+        target_link_libraries(make_sample_project PRIVATE screencam_media)
+        set(SCREENCAM_SAMPLE_PROJECT ${CMAKE_CURRENT_BINARY_DIR}/test-data/Sample.screencam)
+        add_test(NAME make_sample_project COMMAND make_sample_project ${SCREENCAM_SAMPLE_PROJECT} 3)
+        add_test(NAME ui_smoke_editor COMMAND ScreenCam --self-test --open ${SCREENCAM_SAMPLE_PROJECT})
+        set_tests_properties(make_sample_project PROPERTIES
+            ENVIRONMENT "QT_QPA_PLATFORM=offscreen" FIXTURES_SETUP sample_project)
+        set_tests_properties(ui_smoke_editor PROPERTIES
+            ENVIRONMENT "QT_QPA_PLATFORM=offscreen" FIXTURES_REQUIRED sample_project)
     endif()
 
     # Window/taskbar icon at runtime (all platforms).

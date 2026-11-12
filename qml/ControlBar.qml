@@ -1,10 +1,14 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Dialogs
 import QtQuick.Layouts
 
 // Bottom bar: record/stop button, status + timer, pause/stop or "play last recording".
 Rectangle {
     id: bar
+
+    // Emitted with the chosen .screencam folder.
+    signal projectChosen(string folder)
 
     readonly property bool recording: Recorder.state === Recorder.Recording
     readonly property bool paused: Recorder.state === Recorder.Paused
@@ -109,8 +113,14 @@ Rectangle {
         StyledButton {
             visible: Recorder.state === Recorder.Idle && Recorder.lastRecording.length > 0
             accent: true
-            text: qsTr("Play recording")
+            text: Recorder.lastRecording.endsWith(".screencam") ? qsTr("Edit recording") : qsTr("Play recording")
             onClicked: Recorder.openLastRecording()
+        }
+
+        StyledButton {
+            visible: Recorder.state === Recorder.Idle
+            text: qsTr("Open project…")
+            onClicked: projectDialog.open()
         }
 
         StyledButton {
@@ -118,5 +128,13 @@ Rectangle {
             text: qsTr("Show folder")
             onClicked: RecordingSettings.openOutputFolder()
         }
+    }
+
+    // Projects are folders ("Name.screencam"), so pick a folder.
+    FolderDialog {
+        id: projectDialog
+        title: qsTr("Open a ScreenCam project (.screencam folder)")
+        currentFolder: RecordingSettings.outputFolderUrl
+        onAccepted: bar.projectChosen(selectedFolder.toString())
     }
 }
