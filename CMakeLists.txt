@@ -35,6 +35,7 @@ add_library(screencam_core STATIC
     src/core/Nv12.cpp
     src/core/Resolution.cpp
     src/core/TimeFormat.cpp
+    src/core/Timeline.cpp
 )
 target_include_directories(screencam_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_options(screencam_core PRIVATE ${SCREENCAM_WARNINGS})

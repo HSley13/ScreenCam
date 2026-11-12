@@ -12,6 +12,7 @@
 #include "core/EncoderPlan.hpp"
 #include "core/Resolution.hpp"
 #include "core/TimeFormat.hpp"
+#include "core/Timeline.hpp"
 
 namespace {
 
@@ -219,6 +220,26 @@ void testAudioLevel() {
     CHECK(near(smoothMeterLevel(0.3, 0.9, 0.25), 0.9));  // jumps up immediately
 }
 
+void testTimeline() {
+    const std::vector<std::int64_t> starts{0, 5000, 12000};
+    CHECK(segmentAt(starts, 0) == 0);
+    CHECK(segmentAt(starts, 4999) == 0);
+    CHECK(segmentAt(starts, 5000) == 1);   // a segment owns its start time
+    CHECK(segmentAt(starts, 11999) == 1);
+    CHECK(segmentAt(starts, 60000) == 2);  // after the last cut: last segment
+    CHECK(segmentAt(starts, -10) == 0);
+    CHECK(segmentAt({}, 100) == -1);
+
+    // 30 s video, segments must stay >= 500 ms.
+    CHECK(canSplitAt(starts, 8000, 30000, 500));
+    CHECK(!canSplitAt(starts, 5200, 30000, 500));   // too close to the cut at 5000
+    CHECK(!canSplitAt(starts, 200, 30000, 500));    // too close to the start
+    CHECK(!canSplitAt(starts, 29800, 30000, 500));  // too close to the end
+
+    CHECK(insertionIndex(starts, 8000) == 2);
+    CHECK(insertionIndex(starts, 20000) == 3);
+}
+
 }  // namespace
 
 int main() {
@@ -236,6 +257,7 @@ int main() {
     testYuvColours();
     testNv12Conversion();
     testAudioLevel();
+    testTimeline();
 
     if (g_failures == 0) {
         std::cout << "All core tests passed\n";
