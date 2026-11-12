@@ -53,6 +53,7 @@ if(APPLE)
         src/platform/MicCapture.mm
         src/platform/ScreenCapture.mm
         src/recording/MovieWriter.mm
+        src/recording/RecordingSession.mm
         src/platform/CameraCapture.mm
         src/platform/ClockSync.mm
         src/ui/CameraBubbleWindow.mm
