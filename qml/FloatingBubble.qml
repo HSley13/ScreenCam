@@ -2,8 +2,9 @@ import QtQuick
 import QtQuick.Window
 
 // Your camera, floating on the desktop above every app (like Loom). Drag it anywhere; scroll
-// over it to resize. It is excluded from the screen recording: the camera is recorded as a
-// separate track, and its place in the video is set (and can be changed) in the editor.
+// over it to resize. While recording, the recording controls (timer, what's recorded, pause,
+// stop) hang from its bottom edge. It is excluded from the screen recording: the camera is
+// recorded as a separate track, and its place in the video is set in the editor.
 Window {
     id: win
 
@@ -11,10 +12,22 @@ Window {
     // Same size rules as in the video, relative to this screen.
     readonly property rect area: BubbleStyle.revision >= 0 ? BubbleStyle.rectFor(Screen.width, Screen.height)
                                                            : Qt.rect(0, 0, 0, 0)
+    readonly property bool showControls: Recorder.busy
+    // The controls straddle the bubble's bottom edge: half over it, half below.
+    readonly property real controlsOverhang: showControls ? controls.implicitHeight / 2 : 0
+    readonly property real contentWidth: Math.max(area.width, showControls ? controls.implicitWidth : 0)
 
-    title: qsTr("ScreenCam Camera")  // starts with the app name: hidden from the window list
-    width: area.width + 2 * padding
-    height: area.height + 2 * padding
+    title: qsTr("ScreenCam Camera")
+    width: contentWidth + 2 * padding
+    height: area.height + controlsOverhang + 2 * padding
+
+    // When the controls make the window wider, grow it equally to both sides so the bubble
+    // itself doesn't jump.
+    property real previousWidth: width
+    onWidthChanged: {
+        x = x - (width - previousWidth) / 2;
+        previousWidth = width;
+    }
     color: "transparent"
     flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.NoDropShadowWindowHint
            | (Qt.platform.os === "osx" ? 0 : Qt.Tool)  // Tool windows hide with the app on macOS
@@ -37,12 +50,13 @@ Window {
     Timer {
         id: reportTimer
         interval: 250
-        onTriggered: Recorder.setBubbleDesktopCenter(Qt.point(win.x + win.width / 2, win.y + win.height / 2))
+        onTriggered: Recorder.setBubbleDesktopCenter(Qt.point(win.x + view.x + view.width / 2,
+                                                               win.y + view.y + view.height / 2))
     }
 
     BubbleView {
         id: view
-        x: win.padding
+        x: (win.width - width) / 2
         y: win.padding
         width: win.area.width
         height: win.area.height
@@ -92,5 +106,13 @@ Window {
         onWheel: (wheel) => {
             BubbleStyle.size = BubbleStyle.size + wheel.angleDelta.y / 120 * 0.01;
         }
+    }
+
+    RecordingControls {
+        id: controls
+        visible: win.showControls
+        anchors.horizontalCenter: view.horizontalCenter
+        y: view.y + view.height - height / 2
+        targetMaxWidth: 200
     }
 }
