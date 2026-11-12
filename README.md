@@ -6,7 +6,9 @@ built with CMake. Runs on **macOS, Windows and Linux** from the same code.
 **What you can do**
 
 - Record **Screen + Camera**, **Screen only**, or **Camera only** (landscape 16:9 or portrait 9:16).
-- Record the **entire screen**, **one window** (any app), or a **region** you draw on the screen.
+- Record the **entire screen**, **one app window**, or a **region** you draw on the screen.
+  The window list shows only real app windows ("Safari — GitHub"), not the menu bar, its
+  icons (clock, battery, CPU meters), the Dock, the taskbar or tool pop-ups.
 - While recording, your camera floats on the desktop as a **bubble window** you can drag
   anywhere, next to a **small floating control bar** (pause / stop / timer). ScreenCam's own
   windows are left out of the recording on macOS and Windows, so the preview never shows an
@@ -215,6 +217,7 @@ cmake --workflow --preset default        # configure + build + test (Debug, in b
 | `make_sample_project` | (fixture) records a 3-second synthetic project for the tests below |
 | `tst_project_editor` | per-part styles, selection isn't an edit, autosave, export path |
 | `tst_export` | exported MP4 has the bubble where each part puts it, hidden camera, cancel, worker thread |
+| `tst_app_windows` | (Linux, Xvfb) a fake desktop: only the app window is listed, and Qt's entry carries the same id |
 | `ui_smoke` | the whole QML UI loads headless with **zero** QML warnings (`ScreenCam --self-test`) |
 | `ui_smoke_editor` | the editor loads the sample project with zero QML warnings |
 
@@ -312,6 +315,9 @@ Dependencies point downwards only: `qml → app → export → media → core`.
 - **`TimeFormat`** — `formatElapsed()` → `00:42`, `1:02:03`.
 - **`Timeline`** — `segmentAt()`, `canSplitAt()` (cuts at least 0.5 s apart, not at the
   ends), `insertionIndex()`: the rules every timeline edit goes through.
+- **`WindowFilter`** — `isUserAppWindow()`: what counts as an app window (normal window level,
+  owned by a regular app, not a tool/dock/pop-up window, not hidden on another desktop, has
+  minimize/maximize, at least 120×80); `windowLabel()` → `"Safari — GitHub"`.
 - **`BubbleGeometry::aspectFitRect()`** — letterboxing a window/region into the canvas.
 
 ### `src/media/` — painting and encoding
@@ -392,6 +398,17 @@ Dependencies point downwards only: `qml → app → export → media → core`.
   edit). Autosaves 0.6 s after the last change. `exportVideo()` / `cancelExport()` /
   `playLastExport()` drive the exporter when it was built.
 - **`WindowTools`** — `excludeFromCapture(window)` (macOS in `WindowTools_mac.mm`).
+- **`AppWindows`** — `listAppWindows()` asks the OS about every open window and keeps the
+  ones `WindowFilter` accepts. Qt's own list (`QWindowCapture::capturableWindows()`) contains
+  *every* window with only a title, so `CaptureSources::refreshWindows()` keeps the Qt
+  entries whose native id (read from Qt's private `QCapturableWindowPrivate`) is in ours.
+  - macOS (`AppWindows_mac.mm`): `CGWindowListCopyWindowInfo` gives the level, size and
+    owner; `NSRunningApplication.activationPolicy` tells a Dock app from a menu-bar utility.
+  - Windows (`AppWindows_win.cpp`): `EnumWindows` + the taskbar's rules (`WS_EX_TOOLWINDOW`,
+    owner window, `WS_EX_APPWINDOW`), `DWMWA_CLOAKED` for other virtual desktops, the app
+    name from the .exe's version info.
+  - Linux (`AppWindows_x11.cpp`): `_NET_CLIENT_LIST` and the EWMH window type/state/allowed
+    actions; app name from `WM_CLASS`.
 - **`main.cpp`** — `QApplication` (the tray icon needs Widgets on Windows/Linux), Basic
   style, window icon, `--open <project>`, and `--self-test [--screenshot file]` (load the UI,
   exit non-zero on QML warnings).

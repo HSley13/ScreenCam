@@ -27,7 +27,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ninja-build libgl1-mesa-dev libegl1 libxkbcommon-dev libxkbcommon-x11-0 \
             libxcb-cursor0 libpulse-dev \
-            libavformat-dev libavcodec-dev libswscale-dev  # for video export
+            libavformat-dev libavcodec-dev libswscale-dev \
+            libx11-dev xvfb  # window picker + its test on a virtual X server
 
       - name: Install build tools (macOS)
         if: runner.os == 'macOS'
