@@ -56,6 +56,7 @@ if(SCREENCAM_BUILD_APP)
     set(SCREENCAM_APP_SOURCES
         src/app/AudioLevelMeter.cpp src/app/AudioLevelMeter.hpp
         src/app/DeviceCatalog.cpp src/app/DeviceCatalog.hpp
+        src/app/RecordingSettings.cpp src/app/RecordingSettings.hpp
     )
     set(SCREENCAM_QML_FILES
         qml/Main.qml
