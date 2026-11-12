@@ -163,6 +163,43 @@ if(SCREENCAM_BUILD_APP)
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
         MACOSX_BUNDLE_ICON_FILE "ScreenCam.icns")
 
+    # macOS remembers Camera / Microphone / Screen Recording permission per *code signature*.
+    # The linker's automatic ad-hoc signature is a hash of the binary, so every rebuild looks
+    # like a new app and the permission you granted no longer applies. Sign every build with one
+    # fixed identity instead (scripts/create-macos-signing-identity.sh creates
+    # "ScreenCam Development" once); ad hoc ("-") is only the fallback.
+    if(APPLE)
+        set(SCREENCAM_SIGNING_NAME "ScreenCam Development")
+        execute_process(COMMAND security find-identity -v -p codesigning
+            OUTPUT_VARIABLE _screencam_identities ERROR_QUIET)
+        if(_screencam_identities MATCHES "\"${SCREENCAM_SIGNING_NAME}\"")
+            set(_screencam_found_identity "${SCREENCAM_SIGNING_NAME}")
+        else()
+            set(_screencam_found_identity "-")
+        endif()
+        set(SCREENCAM_CODESIGN_IDENTITY "${_screencam_found_identity}" CACHE STRING
+            "codesign identity for ScreenCam.app ('-' = ad hoc)")
+        # Upgrade an earlier ad-hoc choice once the identity exists.
+        if(SCREENCAM_CODESIGN_IDENTITY STREQUAL "-" AND NOT _screencam_found_identity STREQUAL "-")
+            set(SCREENCAM_CODESIGN_IDENTITY "${_screencam_found_identity}" CACHE STRING
+                "codesign identity for ScreenCam.app ('-' = ad hoc)" FORCE)
+        endif()
+        if(SCREENCAM_CODESIGN_IDENTITY STREQUAL "-")
+            message(WARNING
+                "ScreenCam is signed ad hoc, so macOS forgets its Screen Recording / Camera / Microphone "
+                "permission after every rebuild. Run scripts/create-macos-signing-identity.sh once, then "
+                "reconfigure.")
+        else()
+            message(STATUS "ScreenCam: signing with '${SCREENCAM_CODESIGN_IDENTITY}'")
+        endif()
+
+        add_custom_command(TARGET ScreenCam POST_BUILD
+            COMMAND codesign --force --sign "${SCREENCAM_CODESIGN_IDENTITY}"
+                    --identifier com.hsley13.screencam "$<TARGET_BUNDLE_DIR:ScreenCam>"
+            COMMENT "Signing ScreenCam.app (${SCREENCAM_CODESIGN_IDENTITY})"
+            VERBATIM)
+    endif()
+
     if(SCREENCAM_BUILD_TESTS)
         # Loads the whole QML UI headless and fails on any QML warning.
         add_test(NAME ui_smoke COMMAND ScreenCam --self-test)
@@ -193,11 +230,9 @@ if(SCREENCAM_BUILD_APP)
     install(SCRIPT ${screencam_deploy_script})
 
     if(APPLE)
-        # Deployment rewrites the binaries, which breaks their signature; re-sign ad hoc so
-        # macOS accepts the bundle and remembers its camera/mic/screen permissions.
-        install(CODE [[
-            execute_process(COMMAND codesign --force --deep --sign - "${CMAKE_INSTALL_PREFIX}/ScreenCam.app")
-        ]])
+        # Deployment rewrites the binaries, which breaks their signature: re-sign the whole
+        # bundle (with the same identity as the build, so granted permissions carry over).
+        install(CODE "execute_process(COMMAND codesign --force --deep --sign \"${SCREENCAM_CODESIGN_IDENTITY}\" --identifier com.hsley13.screencam \"\${CMAKE_INSTALL_PREFIX}/ScreenCam.app\")")
     elseif(UNIX)
         install(FILES packaging/linux/screencam.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
         install(FILES packaging/icons/screencam.png
