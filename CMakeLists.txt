@@ -87,12 +87,16 @@ if(SCREENCAM_BUILD_APP)
     set(SCREENCAM_QML_FILES
         qml/BubbleSection.qml
         qml/CameraBubble.qml
+        qml/ControlBar.qml
+        qml/CountdownOverlay.qml
+        qml/ErrorBanner.qml
         qml/Main.qml
         qml/PreviewStage.qml
         qml/SettingsPanel.qml
         qml/Theme.qml
         qml/components/Field.qml
         qml/components/LevelMeter.qml
+        qml/components/RecordButton.qml
         qml/components/SegmentedControl.qml
         qml/components/ShapePicker.qml
         qml/components/SidebarSection.qml
@@ -113,6 +117,9 @@ if(SCREENCAM_BUILD_APP)
         # C++ types use QtQuick value types (color, size, rect): tell the tooling about it.
         DEPENDENCIES QtQuick
         QML_FILES ${SCREENCAM_QML_FILES}
+        RESOURCES
+            qml/icons/tray-paused.png
+            qml/icons/tray-recording.png
         SOURCES ${SCREENCAM_APP_SOURCES}
     )
     # src/app too: the generated QML type registrations include the headers by file name.
