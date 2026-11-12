@@ -53,22 +53,50 @@ if(SCREENCAM_BUILD_APP)
     find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Widgets Qml Quick QuickControls2 Multimedia)
     qt_standard_project_setup(REQUIRES 6.8)
 
+    # Media library: compositing + encoding, Qt-only (no QML) so the tests can link it.
+    add_library(screencam_media STATIC
+        src/media/BubbleStyleSnapshot.cpp src/media/BubbleStyleSnapshot.hpp
+        src/media/FrameCompositor.cpp src/media/FrameCompositor.hpp
+        src/media/RecordingPipeline.cpp src/media/RecordingPipeline.hpp
+    )
+    target_include_directories(screencam_media PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(screencam_media PUBLIC screencam_core Qt6::Gui Qt6::Multimedia)
+    target_compile_options(screencam_media PRIVATE ${SCREENCAM_WARNINGS})
+
+    if(SCREENCAM_BUILD_TESTS)
+        find_package(Qt6 REQUIRED COMPONENTS Test)
+        # Media tests run without a display (offscreen platform) so they also work in CI.
+        function(screencam_add_qt_test name)
+            qt_add_executable(${name} tests/${name}.cpp)
+            target_link_libraries(${name} PRIVATE screencam_media Qt6::Test)
+            add_test(NAME ${name} COMMAND ${name})
+            set_tests_properties(${name} PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+        endfunction()
+        screencam_add_qt_test(tst_compositor)
+        screencam_add_qt_test(tst_pipeline)
+    endif()
+
     set(SCREENCAM_APP_SOURCES
         src/app/AudioLevelMeter.cpp src/app/AudioLevelMeter.hpp
         src/app/BubbleStyle.cpp src/app/BubbleStyle.hpp
         src/app/CaptureSources.cpp src/app/CaptureSources.hpp
         src/app/DeviceCatalog.cpp src/app/DeviceCatalog.hpp
+        src/app/RecordingController.cpp src/app/RecordingController.hpp
         src/app/RecordingSettings.cpp src/app/RecordingSettings.hpp
     )
     set(SCREENCAM_QML_FILES
         qml/BubbleSection.qml
         qml/CameraBubble.qml
+        qml/ControlBar.qml
+        qml/CountdownOverlay.qml
+        qml/ErrorBanner.qml
         qml/Main.qml
         qml/PreviewStage.qml
         qml/SettingsPanel.qml
         qml/Theme.qml
         qml/components/Field.qml
         qml/components/LevelMeter.qml
+        qml/components/RecordButton.qml
         qml/components/SegmentedControl.qml
         qml/components/ShapePicker.qml
         qml/components/SidebarSection.qml
@@ -89,13 +117,16 @@ if(SCREENCAM_BUILD_APP)
         # C++ types use QtQuick value types (color, size, rect): tell the tooling about it.
         DEPENDENCIES QtQuick
         QML_FILES ${SCREENCAM_QML_FILES}
+        RESOURCES
+            qml/icons/tray-paused.png
+            qml/icons/tray-recording.png
         SOURCES ${SCREENCAM_APP_SOURCES}
     )
     # src/app too: the generated QML type registrations include the headers by file name.
     target_include_directories(ScreenCam PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/src/app)
     target_compile_definitions(ScreenCam PRIVATE SCREENCAM_VERSION="${PROJECT_VERSION}")
     target_link_libraries(ScreenCam PRIVATE
-        screencam_core
+        screencam_media
         Qt6::Widgets
         Qt6::Quick
         Qt6::QuickControls2

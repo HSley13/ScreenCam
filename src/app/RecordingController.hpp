@@ -1,0 +1,89 @@
+#pragma once
+
+#include "media/RecordingPipeline.hpp"
+
+#include <QElapsedTimer>
+#include <QObject>
+#include <QTimer>
+#include <QtQml/qqmlregistration.h>
+
+class QJSEngine;
+class QQmlEngine;
+
+/// The record button's brain (QML singleton `Recorder`).
+///
+///   Idle ──start()──► Countdown ──(n s)──► Recording ◄──togglePause()──► Paused
+///     ▲                   │ cancel               │ stop()                  │ stop()
+///     └───────────────────┴──────────── Finalizing ◄─────────────────────────┘
+///
+/// It snapshots the settings when recording begins, keeps the capture inputs alive while the
+/// window is hidden, forwards live frames and bubble edits to the pipeline, and reports the
+/// saved file.
+class RecordingController : public QObject {
+    Q_OBJECT
+    QML_NAMED_ELEMENT(Recorder)
+    QML_SINGLETON
+
+    Q_PROPERTY(State state READ state NOTIFY stateChanged)
+    Q_PROPERTY(bool busy READ busy NOTIFY stateChanged)
+    Q_PROPERTY(int countdownRemaining READ countdownRemaining NOTIFY countdownRemainingChanged)
+    Q_PROPERTY(QString elapsedText READ elapsedText NOTIFY elapsedChanged)
+    Q_PROPERTY(QString lastRecording READ lastRecording NOTIFY lastRecordingChanged)
+    Q_PROPERTY(QString lastRecordingName READ lastRecordingName NOTIFY lastRecordingChanged)
+    Q_PROPERTY(QString errorString READ errorString NOTIFY errorStringChanged)
+
+public:
+    enum class State { Idle, Countdown, Recording, Paused, Finalizing };
+    Q_ENUM(State)
+
+    static RecordingController *instance();
+    static RecordingController *create(QQmlEngine *qmlEngine, QJSEngine *jsEngine);
+
+    State state() const { return m_state; }
+    bool busy() const { return m_state != State::Idle; }
+    int countdownRemaining() const { return m_countdownRemaining; }
+    QString elapsedText() const;
+    QString lastRecording() const { return m_lastRecording; }
+    QString lastRecordingName() const;
+    QString errorString() const { return m_errorString; }
+
+    Q_INVOKABLE void start();
+    Q_INVOKABLE void stop();
+    Q_INVOKABLE void togglePause();
+    Q_INVOKABLE void toggleRecording();  // start, or stop if already going
+    Q_INVOKABLE void cancelCountdown();
+    Q_INVOKABLE void openLastRecording() const;
+    Q_INVOKABLE void clearError();
+
+signals:
+    void stateChanged();
+    void countdownRemainingChanged();
+    void elapsedChanged();
+    void lastRecordingChanged();
+    void errorStringChanged();
+    /// The window should get out of the way (minimize) / come back.
+    void windowHideRequested();
+    void windowShowRequested();
+
+private:
+    explicit RecordingController(QObject *parent = nullptr);
+
+    QString validate() const;
+    void beginRecording();
+    void finish();
+    void setState(State state);
+    void setError(const QString &message);
+    QString nextOutputPath() const;
+    qint64 activeMilliseconds() const;
+
+    RecordingPipeline m_pipeline;
+    State m_state = State::Idle;
+    QTimer m_countdownTimer;
+    int m_countdownRemaining = 0;
+    QTimer m_elapsedTicker;  // refreshes elapsedText a few times per second
+    QElapsedTimer m_clock;
+    qint64 m_pausedMs = 0;
+    qint64 m_pauseStartedMs = -1;
+    QString m_lastRecording;
+    QString m_errorString;
+};
