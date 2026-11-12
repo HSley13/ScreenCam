@@ -28,6 +28,7 @@ endif()
 # Portable core: plain C++20, no Qt -> geometry, sizes, pixel conversion.
 # ---------------------------------------------------------------------------
 add_library(screencam_core STATIC
+    src/core/BubbleGeometry.cpp
     src/core/CameraLayout.cpp
     src/core/EncoderPlan.cpp
     src/core/Resolution.cpp
