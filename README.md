@@ -77,10 +77,21 @@ cmake --build . --parallel && cmake --install .
 Afterwards `/usr/local/Qt-6.10.0/plugins/multimedia/` contains `libffmpegmediaplugin.dylib`.
 Re-run CMake for ScreenCam (`rm -rf build && cmake --preset release`).
 
-Permissions: macOS asks for **Camera** and **Microphone** the first time. **Screen Recording**
-must be enabled in *System Settings ▸ Privacy & Security ▸ Screen & System Audio Recording*;
-then quit and reopen ScreenCam. The build is ad-hoc signed, so after reinstalling a new build
-macOS may ask again (remove and re-add ScreenCam in that list if the preview stays black).
+**Permissions (do this once).** macOS remembers Camera / Microphone / Screen Recording
+permission per *code signature*. An ad-hoc signature changes with every build, so macOS would
+forget the permission after each rebuild. Create a fixed signing identity once:
+
+```bash
+scripts/create-macos-signing-identity.sh       # asks for your password to trust it
+rm -rf build && cmake --preset default && cmake --build --preset default   # now signed with it
+tccutil reset ScreenCapture com.hsley13.screencam                          # drop stale entries
+open build/ScreenCam.app
+```
+
+Allow **Camera** and **Microphone** when asked; enable **Screen Recording** in *System Settings ▸
+Privacy & Security ▸ Screen & System Audio Recording*, then **quit (⌘Q) and reopen** ScreenCam —
+macOS only re-checks screen access when the app starts. Start it with `open` (or from Finder):
+launched from a terminal, macOS checks the *terminal's* permission instead of ScreenCam's.
 
 ### Windows
 
@@ -283,8 +294,11 @@ Dependencies point downwards only: `qml → app → media → core`.
 - **Empty screen preview + banner "built without the FFmpeg multimedia backend"** — your Qt
   has only the native backend (e.g. `plugins/multimedia/libdarwinmediaplugin.dylib`). Install
   Qt with the Qt Online Installer, or rebuild Qt Multimedia with `-ffmpeg-dir` (see *macOS*).
-- **"The screen capture is running but delivers no picture"** — on macOS, grant Screen
-  Recording (see above) and reopen the app.
+- **"macOS hasn't given ScreenCam access to the screen" even though you allowed it** — the
+  build you're running has a different signature than the one you allowed (each ad-hoc build
+  does), or it was launched from a terminal, or it wasn't restarted after allowing. Follow
+  *Permissions (do this once)* above.
+- **"The screen capture is running but delivers no picture"** — same causes as above.
 - **Log lines `Packet with invalid duration … in stream 0`** — printed by FFmpeg's MP4 muxer
   for B-frames that Qt 6.8 doesn't give a duration. Harmless: `tst_pipeline` checks that
   frame times increase and the file plays with the right duration.

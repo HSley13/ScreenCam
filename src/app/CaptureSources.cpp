@@ -25,6 +25,18 @@ QString noScreenPictureMessage() {
         "Privacy & Security ▸ Screen & System Audio Recording, then quit and reopen it.");
 }
 
+/// Qt's macOS backend reports a missing grant as just "Permissions denied". macOS only
+/// re-checks the grant when the app starts, and judges the app that *launched* it: started
+/// from a terminal, it's the terminal's permission that counts.
+QString screenPermissionMessage() {
+    return QCoreApplication::translate(
+        "CaptureSources",
+        "macOS hasn't given ScreenCam access to the screen. Turn ScreenCam on under System Settings ▸ Privacy & "
+        "Security ▸ Screen & System Audio Recording, then quit ScreenCam (⌘Q) and open it again with "
+        "`open build/ScreenCam.app` — launched from a terminal, macOS checks the terminal's permission instead. "
+        "If it keeps asking after every rebuild, run scripts/create-macos-signing-identity.sh once (see README).");
+}
+
 /// Best camera mode for a bubble: the largest resolution up to 1080p that runs at >= 24 fps
 /// (falls back to the largest mode if none is that fast). 4K webcam modes would only cost CPU,
 /// since the camera never fills more than a 1080p-sized area of the video.
@@ -117,7 +129,11 @@ CaptureSources::CaptureSources(QObject *parent)
     });
     connect(&m_screenCapture, &QScreenCapture::errorOccurred, this,
             [this](QScreenCapture::Error, const QString &message) {
-                setScreenError(message.isEmpty() ? tr("Screen capture failed.") : message);
+                if (message.contains(QStringLiteral("ermission"))) {
+                    setScreenError(screenPermissionMessage());
+                } else {
+                    setScreenError(message.isEmpty() ? tr("Screen capture failed.") : message);
+                }
             });
 
     // React to the user's choices.
