@@ -20,6 +20,17 @@ RecordingPipeline::RecordingPipeline(QObject *parent)
     connect(m_compositor, &FrameCompositor::frameReady, this, &RecordingPipeline::sendFrame);
     connect(m_compositor, &FrameCompositor::clockStarted, this, &RecordingPipeline::clockStarted);
     connect(&m_recorder, &QMediaRecorder::recorderStateChanged, this, &RecordingPipeline::onRecorderStateChanged);
+
+    // Long recordings can take a few seconds to close (the MP4 index is written at the end),
+    // so be generous before declaring the encoder stuck.
+    m_stopTimeout.setSingleShot(true);
+    m_stopTimeout.setInterval(20000);
+    connect(&m_stopTimeout, &QTimer::timeout, this, [this] {
+        if (m_active && m_error.isEmpty()) {
+            m_error = tr("Saving the recording took too long; the file may be incomplete.");
+        }
+        finish();
+    });
     connect(&m_recorder, &QMediaRecorder::errorOccurred, this, [this](QMediaRecorder::Error, const QString &message) {
         m_error = message.isEmpty() ? tr("The recording failed.") : message;
         if (m_recorder.recorderState() == QMediaRecorder::StoppedState) {
@@ -117,6 +128,15 @@ void RecordingPipeline::stop() {
     m_stopping = true;
     // Blocking: once this returns, the compositor emits no more frames.
     onCompositor([](FrameCompositor *c) { c->stop(); }, Qt::BlockingQueuedConnection);
+    if (m_recorder.recorderState() == QMediaRecorder::StoppedState) {
+        // The recorder never got going (or already ended): it won't report "stopped" again,
+        // so finish now instead of waiting for a signal that never comes.
+        finish();
+        return;
+    }
+    // Normally the recorder reports StoppedState within a second. If the encoder hangs, don't
+    // leave the app stuck in "Saving…": give up after a while and report it.
+    m_stopTimeout.start();
     m_recorder.stop();
 }
 
@@ -143,6 +163,7 @@ void RecordingPipeline::finish() {
     m_active = false;
     m_paused = false;
     m_stopping = false;
+    m_stopTimeout.stop();
     onCompositor([](FrameCompositor *c) { c->stop(); });
     m_session.setAudioInput(nullptr);
     m_audioInput.reset();

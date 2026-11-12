@@ -285,6 +285,7 @@ void CaptureSources::updateScreen() {
     }
     m_screenCapture.setActive(wantScreen);
     m_windowCapture.setActive(wantWindow);
+    emit targetChanged();  // every choice that changes what's recorded ends up here
 }
 
 QVariantList CaptureSources::windows() const {
@@ -356,6 +357,55 @@ void CaptureSources::refreshWindows() {
     }
     emit windowsChanged();
     updateScreen();
+}
+
+QString CaptureSources::targetLabel() const {
+    const RecordingSettings *settings = RecordingSettings::instance();
+    if (!settings->usesScreen()) {
+        return tr("Camera only");
+    }
+    const QScreen *screen = DeviceCatalog::findScreen(settings->screenId());
+    const QString screenName = screen != nullptr ? screen->name() : tr("no screen");
+    switch (settings->captureTarget()) {
+    case RecordingSettings::CaptureTarget::Window:
+        if (m_selectedWindow >= 0 && m_selectedWindow < m_windowLabels.size()) {
+            return m_windowLabels.at(m_selectedWindow);
+        }
+        return tr("No window chosen");
+    case RecordingSettings::CaptureTarget::Region:
+        return tr("Region %1 × %2 · %3")
+            .arg(settings->region().width())
+            .arg(settings->region().height())
+            .arg(screenName);
+    case RecordingSettings::CaptureTarget::Screen:
+        break;
+    }
+    return tr("Entire screen · %1").arg(screenName);
+}
+
+QRect CaptureSources::targetBounds() const {
+    const RecordingSettings *settings = RecordingSettings::instance();
+    if (!settings->usesScreen()) {
+        return {};
+    }
+    switch (settings->captureTarget()) {
+    case RecordingSettings::CaptureTarget::Window:
+        if (m_selectedWindow >= 0 && m_selectedWindow < m_windowIds.size() && m_windowIds.at(m_selectedWindow) != 0) {
+            return appWindowBounds(m_windowIds.at(m_selectedWindow));
+        }
+        return {};
+    case RecordingSettings::CaptureTarget::Region: {
+        // The region is stored relative to its screen; the outline needs desktop coordinates.
+        const QScreen *screen = DeviceCatalog::findScreen(settings->screenId());
+        if (screen == nullptr) {
+            return {};
+        }
+        return settings->region().translated(screen->geometry().topLeft());
+    }
+    case RecordingSettings::CaptureTarget::Screen:
+        break;
+    }
+    return {};  // the whole screen: an outline around it would just be the screen's edge
 }
 
 void CaptureSources::setSelectedWindow(int index) {

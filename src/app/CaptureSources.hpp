@@ -52,6 +52,8 @@ class CaptureSources : public QObject {
     // name; see refreshWindows().
     Q_PROPERTY(QVariantList windows READ windows NOTIFY windowsChanged)
     Q_PROPERTY(int selectedWindow READ selectedWindow WRITE setSelectedWindow NOTIFY windowsChanged)
+    // What is being recorded, in words: "Safari — GitHub", "Entire screen · Built-in Display".
+    Q_PROPERTY(QString targetLabel READ targetLabel NOTIFY targetChanged)
 
 public:
     static CaptureSources *instance();
@@ -78,6 +80,11 @@ public:
     void setSelectedWindow(int index);
     /// Re-reads the list of open windows (windows come and go, so the UI asks on demand).
     Q_INVOKABLE void refreshWindows();
+    QString targetLabel() const;
+    /// Where the recorded window or region is on the desktop right now (Qt global
+    /// coordinates), for the outline drawn around it. Empty for a whole screen, for a window
+    /// that is minimized or closed, and in Camera-only mode.
+    Q_INVOKABLE QRect targetBounds() const;
     /// Size of the video file for the current settings (see computeOutputSize in the .cpp).
     QSize outputSize() const;
 
@@ -96,6 +103,7 @@ signals:
     void cameraResolutionChanged();
     void outputSizeChanged();
     void windowsChanged();
+    void targetChanged();
     void screenFrameArrived(const QVideoFrame &frame);
     void cameraFrameArrived(const QVideoFrame &frame);
 

@@ -8,6 +8,7 @@
 #include <QMediaRecorder>
 #include <QObject>
 #include <QThread>
+#include <QTimer>
 #include <QVideoFrameInput>
 
 #include <memory>
@@ -81,5 +82,6 @@ private:
     bool m_active = false;
     bool m_paused = false;
     bool m_stopping = false;
+    QTimer m_stopTimeout;  // stop() never waits forever for the encoder
     int m_droppedFrames = 0;
 };

@@ -7,3 +7,7 @@ QHash<quintptr, AppWindow> listAppWindows(bool *supported) {
     }
     return {};
 }
+
+QRect appWindowBounds(quintptr) {
+    return {};
+}

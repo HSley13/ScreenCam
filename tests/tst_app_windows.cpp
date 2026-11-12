@@ -109,6 +109,12 @@ private slots:
             }
         }
         QVERIFY(foundInQt);
+
+        // Its place on the desktop (no window manager here: exactly where it was created).
+        QCOMPARE(appWindowBounds(static_cast<quintptr>(editor)), QRect(0, 0, 900, 600));
+        XUnmapWindow(m_display, editor);
+        XSync(m_display, False);
+        QVERIFY(appWindowBounds(static_cast<quintptr>(editor)).isEmpty());  // hidden: no outline
     }
 };
 

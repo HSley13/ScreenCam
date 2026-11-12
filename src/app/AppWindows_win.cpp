@@ -3,6 +3,9 @@
 #include "core/WindowFilter.hpp"
 
 #include <QFileInfo>
+#include <QGuiApplication>
+#include <QScreen>
+#include <QtGui/qscreen_platform.h>  // QNativeInterface::QWindowsScreen (the HMONITOR)
 
 #include <vector>
 
@@ -151,4 +154,36 @@ QHash<quintptr, AppWindow> listAppWindows(bool *supported) {
     context.ownPid = GetCurrentProcessId();
     EnumWindows(collectWindow, reinterpret_cast<LPARAM>(&context));
     return result;
+}
+
+QRect appWindowBounds(quintptr id) {
+    const HWND hwnd = reinterpret_cast<HWND>(id);
+    if (!IsWindow(hwnd) || !IsWindowVisible(hwnd) || IsIconic(hwnd)) {
+        return {};
+    }
+    // The *visible* frame: GetWindowRect includes an invisible resize border on Windows 10/11.
+    RECT rect{};
+    if (FAILED(DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &rect, sizeof(rect)))) {
+        GetWindowRect(hwnd, &rect);
+    }
+    // Windows answers in physical pixels; Qt places windows in scaled (logical) units per
+    // screen. Convert relative to the monitor the window is on.
+    const HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO info{};
+    info.cbSize = sizeof(info);
+    if (!GetMonitorInfoW(monitor, &info)) {
+        return {};
+    }
+    for (QScreen *screen : QGuiApplication::screens()) {
+        const auto *native = screen->nativeInterface<QNativeInterface::QWindowsScreen>();
+        if (native == nullptr || native->handle() != monitor) {
+            continue;
+        }
+        const qreal ratio = screen->devicePixelRatio();
+        const QPoint origin = screen->geometry().topLeft();
+        return QRect(origin.x() + qRound((rect.left - info.rcMonitor.left) / ratio),
+                     origin.y() + qRound((rect.top - info.rcMonitor.top) / ratio),
+                     qRound((rect.right - rect.left) / ratio), qRound((rect.bottom - rect.top) / ratio));
+    }
+    return QRect(rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
 }

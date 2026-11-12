@@ -102,11 +102,19 @@ ApplicationWindow {
         anchors.fill: parent
     }
 
-    MiniControlBar {}
+    // Recording controls on their own, when there's no camera bubble to carry them.
+    MiniControlBar {
+        bubbleShown: floatingBubble.visible
+    }
 
-    // Your camera, floating on the desktop (only in Screen + Camera mode).
+    // Frame + name around the window or region being recorded.
+    RecordingOutline {}
+
+    // Your camera, floating on the desktop (only in Screen + Camera mode), with the
+    // recording controls attached while recording.
     FloatingBubble {
-        visible: !window.editing && RecordingSettings.mode === RecordingSettings.ScreenAndCamera
+        id: floatingBubble
+        visible:  !window.editing && RecordingSettings.mode === RecordingSettings.ScreenAndCamera
                  && RecordingSettings.cameraId.length > 0 && Devices.cameraAllowed
     }
 

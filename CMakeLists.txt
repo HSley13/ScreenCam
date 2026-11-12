@@ -167,6 +167,8 @@ if(SCREENCAM_BUILD_APP)
         qml/FloatingBubble.qml
         qml/Main.qml
         qml/MiniControlBar.qml
+        qml/RecordingControls.qml
+        qml/RecordingOutline.qml
         qml/PreviewStage.qml
         qml/RegionSelector.qml
         qml/SettingsPanel.qml

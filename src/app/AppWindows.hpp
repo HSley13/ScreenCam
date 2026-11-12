@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QHash>
+#include <QRect>
 #include <QString>
 
 /// An open app window, as the operating system describes it.
@@ -25,3 +26,8 @@ struct AppWindow {
 /// Implemented per platform: AppWindows_mac.mm, AppWindows_win.cpp, AppWindows_x11.cpp,
 /// AppWindows_other.cpp.
 QHash<quintptr, AppWindow> listAppWindows(bool *supported = nullptr);
+
+/// Where a window is right now, in Qt's global desktop coordinates (the ones QWindow::x/y
+/// use), so a ScreenCam window can be placed around it. Empty if it's closed, minimized or
+/// unknown. Cheap enough to call a few times per second.
+QRect appWindowBounds(quintptr id);
