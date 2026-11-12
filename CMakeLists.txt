@@ -107,6 +107,7 @@ if(SCREENCAM_BUILD_APP)
         qml/ErrorBanner.qml
         qml/FloatingBubble.qml
         qml/Main.qml
+        qml/MiniControlBar.qml
         qml/PreviewStage.qml
         qml/RegionSelector.qml
         qml/SettingsPanel.qml
