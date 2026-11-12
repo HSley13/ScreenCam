@@ -1,5 +1,9 @@
 #import "app/AppDelegate.h"
 
+#import <AVFoundation/AVFoundation.h>
+
+#import "ui/ControlPanelController.h"
+
 namespace {
 
 /// Builds the menu bar in code (we don't use a .xib/.storyboard).
@@ -42,30 +46,69 @@ void ActivateApp() {
 
 }  // namespace
 
+@interface AppDelegate () <ControlPanelDelegate>
+@end
+
 @implementation AppDelegate {
-    NSWindow *_window;  // placeholder until the control panel exists
+    ControlPanelController *_panel;
 }
 
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
     NSApp.mainMenu = BuildMainMenu();
 
-    _window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 420, 200)
-                                          styleMask:(NSWindowStyleMaskTitled | NSWindowStyleMaskClosable)
-                                            backing:NSBackingStoreBuffered
-                                              defer:NO];
-    _window.title = @"ScreenCam";
-    _window.releasedWhenClosed = NO;
-    [_window center];
-    [_window makeKeyAndOrderFront:nil];
+    _panel = [[ControlPanelController alloc] init];
+    _panel.delegate = self;
+    [_panel showWindow:nil];
     ActivateApp();
-}
 
-- (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender {
-    return YES;
+    [self observeSystemChanges];
 }
 
 - (BOOL)applicationSupportsSecureRestorableState:(NSApplication *)app {
     return YES;
+}
+
+/// Keeps the pickers in sync with the hardware and quits when the panel is closed.
+- (void)observeSystemChanges {
+    NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
+    NSOperationQueue *main = NSOperationQueue.mainQueue;
+    __weak AppDelegate *weakSelf = self;
+    void (^refresh)(NSNotification *) = ^(NSNotification *note) {
+        [weakSelf sourcesDidChange];
+    };
+    [center addObserverForName:AVCaptureDeviceWasConnectedNotification object:nil queue:main usingBlock:refresh];
+    [center addObserverForName:AVCaptureDeviceWasDisconnectedNotification object:nil queue:main usingBlock:refresh];
+    [center addObserverForName:NSApplicationDidChangeScreenParametersNotification object:nil queue:main usingBlock:refresh];
+
+    // The panel *is* the app: closing it quits (the camera bubble alone isn't useful).
+    [center addObserverForName:NSWindowWillCloseNotification
+                        object:_panel.window
+                         queue:main
+                    usingBlock:^(NSNotification *note) {
+                        [NSApp terminate:nil];
+                    }];
+}
+
+- (void)sourcesDidChange {
+    [_panel reloadSources];
+    [self applySelection];
+}
+
+/// Applies the panel's current choices. Filled in by later features (camera bubble, recording).
+- (void)applySelection {
+}
+
+#pragma mark - ControlPanelDelegate
+
+- (void)controlPanelSelectionDidChange:(ControlPanelController *)panel {
+    [self applySelection];
+}
+
+- (void)controlPanelDidRequestToggleRecording:(ControlPanelController *)panel {
+    [panel setStatusText:@"Recording isn't implemented yet."];
+}
+
+- (void)controlPanelDidRequestReveal:(ControlPanelController *)panel {
 }
 
 @end
