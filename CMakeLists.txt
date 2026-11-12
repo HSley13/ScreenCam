@@ -50,9 +50,11 @@ if(APPLE)
         src/app/main.mm
         src/app/AppDelegate.mm
         src/platform/DeviceCatalog.mm
+        src/platform/MicCapture.mm
         src/platform/ScreenCapture.mm
         src/recording/MovieWriter.mm
         src/platform/CameraCapture.mm
+        src/platform/ClockSync.mm
         src/ui/CameraBubbleWindow.mm
         src/ui/ControlPanelController.mm
     )
