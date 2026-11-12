@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -14,8 +16,25 @@ ApplicationWindow {
     title: qsTr("ScreenCam")
     color: Theme.window
 
+    // Set from the command line (`ScreenCam --open My.screencam`), see main.cpp.
+    property string initialProject: ""
+    // The project open in the editor; empty = the recorder is showing.
+    property string editorFolder: ""
+    readonly property bool editing: editorFolder.length > 0
+
     // macOS asks for camera/microphone access the first time; elsewhere this is a no-op.
-    Component.onCompleted: Devices.requestPermissions()
+    Component.onCompleted: {
+        Devices.requestPermissions();
+        if (initialProject.length > 0) {
+            openEditor(initialProject);
+        }
+    }
+
+    function openEditor(folder: string) {
+        window.editorFolder = "";  // re-opening the same project reloads it
+        window.editorFolder = folder;
+        window.bringToFront();
+    }
     // Never record ScreenCam's own window (this also stops the preview from showing itself
     // in an endless loop). Re-applied whenever the window is shown again.
     onVisibilityChanged: (visibility) => {
@@ -28,10 +47,12 @@ ApplicationWindow {
     Binding {
         target: Capture
         property: "previewEnabled"
-        value: window.visible && window.visibility !== Window.Minimized
+        value: window.visible && window.visibility !== Window.Minimized && !window.editing
     }
 
+    // --- Recorder -----------------------------------------------------------------------------
     RowLayout {
+        visible: !window.editing
         anchors.fill: parent
         anchors.margins: 16
         spacing: 16
@@ -53,6 +74,7 @@ ApplicationWindow {
 
             ControlBar {
                 Layout.fillWidth: true
+                onProjectChosen: (folder) => window.openEditor(folder)
             }
         }
 
@@ -65,6 +87,17 @@ ApplicationWindow {
         }
     }
 
+    // --- Editor (created only while a project is open) ----------------------------------------
+    Loader {
+        anchors.fill: parent
+        anchors.margins: 16
+        active: window.editing
+        sourceComponent: EditorPage {
+            folder: window.editorFolder
+            onCloseRequested: window.editorFolder = ""
+        }
+    }
+
     CountdownOverlay {
         anchors.fill: parent
     }
@@ -73,7 +106,7 @@ ApplicationWindow {
 
     // Your camera, floating on the desktop (only in Screen + Camera mode).
     FloatingBubble {
-        visible: RecordingSettings.mode === RecordingSettings.ScreenAndCamera
+        visible: !window.editing && RecordingSettings.mode === RecordingSettings.ScreenAndCamera
                  && RecordingSettings.cameraId.length > 0 && Devices.cameraAllowed
     }
 
@@ -94,12 +127,18 @@ ApplicationWindow {
         function onWindowShowRequested() {
             window.bringToFront();
         }
+
+        // A project recording finished (or "Edit recording" was clicked): edit it.
+        function onOpenProjectRequested(folder) {
+            window.openEditor(folder);
+        }
     }
 
     // ⌘⇧R / Ctrl+Shift+R start/stop, ⌘⇧P / Ctrl+Shift+P pause ("Ctrl" means ⌘ on macOS).
     Shortcut {
         sequences: ["Ctrl+Shift+R"]
         context: Qt.ApplicationShortcut
+        enabled: !window.editing || Recorder.busy
         onActivated: Recorder.toggleRecording()
     }
 
