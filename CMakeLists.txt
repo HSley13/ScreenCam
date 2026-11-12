@@ -17,6 +17,8 @@ endif()
 
 option(SCREENCAM_BUILD_APP "Build the Qt application (needs Qt 6.8 or newer)" ON)
 option(SCREENCAM_BUILD_TESTS "Build the unit tests" ON)
+option(SCREENCAM_ENABLE_EXPORT "Video export from the editor (needs the FFmpeg development files)" ON)
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 if(MSVC)
     set(SCREENCAM_WARNINGS /W4 /permissive-)
@@ -77,6 +79,29 @@ if(SCREENCAM_BUILD_APP)
     target_link_libraries(screencam_media PUBLIC screencam_core Qt6::Gui Qt6::Multimedia)
     target_compile_options(screencam_media PRIVATE ${SCREENCAM_WARNINGS})
 
+    # Export library: turns an edited project into a finished MP4 by talking to FFmpeg's
+    # libraries directly (decode -> composite -> encode, faster than real time). Optional:
+    # without the FFmpeg headers the app still records and edits, it just can't export.
+    set(SCREENCAM_HAS_EXPORT OFF)
+    if(SCREENCAM_ENABLE_EXPORT)
+        find_package(FFmpeg 59)  # libavcodec 59 = FFmpeg 5.0
+    endif()
+    if(FFmpeg_FOUND)
+        set(SCREENCAM_HAS_EXPORT ON)
+        add_library(screencam_export STATIC
+            src/export/FFmpegUtil.hpp
+            src/export/ProjectExporter.cpp src/export/ProjectExporter.hpp
+            src/export/VideoFileReader.cpp src/export/VideoFileReader.hpp
+        )
+        target_link_libraries(screencam_export PUBLIC
+            screencam_media FFmpeg::avformat FFmpeg::avcodec FFmpeg::swscale FFmpeg::avutil)
+        target_compile_options(screencam_export PRIVATE ${SCREENCAM_WARNINGS})
+        message(STATUS "Video export: ON (FFmpeg ${FFmpeg_VERSION} in ${FFmpeg_INCLUDE_DIR})")
+    else()
+        message(STATUS "Video export: OFF - FFmpeg development files not found. "
+                       "Pass -DFFMPEG_DIR=<prefix> (see README > Export) to enable it.")
+    endif()
+
     if(SCREENCAM_BUILD_TESTS)
         find_package(Qt6 REQUIRED COMPONENTS Test)
         # Media tests run without a display (offscreen platform) so they also work in CI.
@@ -90,6 +115,23 @@ if(SCREENCAM_BUILD_APP)
         screencam_add_qt_test(tst_pipeline)
         screencam_add_qt_test(tst_media_backend)
         screencam_add_qt_test(tst_project)
+
+        # A tiny real project (synthetic screen + camera) that the editor and export tests open.
+        qt_add_executable(make_sample_project tests/make_sample_project.cpp)
+        target_link_libraries(make_sample_project PRIVATE screencam_media)
+        set(SCREENCAM_SAMPLE_PROJECT ${CMAKE_CURRENT_BINARY_DIR}/test-data/Sample.screencam)
+        add_test(NAME make_sample_project COMMAND make_sample_project ${SCREENCAM_SAMPLE_PROJECT} 3)
+        set_tests_properties(make_sample_project PROPERTIES
+            ENVIRONMENT "QT_QPA_PLATFORM=offscreen" FIXTURES_SETUP sample_project)
+
+        if(SCREENCAM_HAS_EXPORT)
+            qt_add_executable(tst_export tests/tst_export.cpp)
+            target_link_libraries(tst_export PRIVATE screencam_export Qt6::Test)
+            add_test(NAME tst_export COMMAND tst_export)
+            set_tests_properties(tst_export PROPERTIES
+                ENVIRONMENT "QT_QPA_PLATFORM=offscreen;SCREENCAM_SAMPLE_PROJECT=${SCREENCAM_SAMPLE_PROJECT}"
+                FIXTURES_REQUIRED sample_project)
+        endif()
     endif()
 
     set(SCREENCAM_APP_SOURCES
@@ -233,14 +275,8 @@ if(SCREENCAM_BUILD_APP)
         add_test(NAME tst_project_editor COMMAND tst_project_editor)
         set_tests_properties(tst_project_editor PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
-        # Editor smoke test: record a tiny synthetic project first (fixture), then open it.
-        qt_add_executable(make_sample_project tests/make_sample_project.cpp)
-        target_link_libraries(make_sample_project PRIVATE screencam_media)
-        set(SCREENCAM_SAMPLE_PROJECT ${CMAKE_CURRENT_BINARY_DIR}/test-data/Sample.screencam)
-        add_test(NAME make_sample_project COMMAND make_sample_project ${SCREENCAM_SAMPLE_PROJECT} 3)
+        # Editor smoke test: opens the sample project (see make_sample_project above).
         add_test(NAME ui_smoke_editor COMMAND ScreenCam --self-test --open ${SCREENCAM_SAMPLE_PROJECT})
-        set_tests_properties(make_sample_project PROPERTIES
-            ENVIRONMENT "QT_QPA_PLATFORM=offscreen" FIXTURES_SETUP sample_project)
         set_tests_properties(ui_smoke_editor PROPERTIES
             ENVIRONMENT "QT_QPA_PLATFORM=offscreen" FIXTURES_REQUIRED sample_project)
     endif()
