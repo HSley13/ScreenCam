@@ -139,6 +139,10 @@ void RecordingController::start() {
 
     // Keep the camera/screen running even when the window gets minimized.
     CaptureSources::instance()->setRecordingActive(true);
+    // Get out of the way right away: the countdown runs in the floating mini control bar.
+    if (RecordingSettings::instance()->hideWindowWhileRecording()) {
+        emit windowHideRequested();
+    }
 
     const int countdown = RecordingSettings::instance()->countdownSeconds();
     if (countdown > 0) {
@@ -153,13 +157,11 @@ void RecordingController::start() {
 
 void RecordingController::beginRecording() {
     const RecordingSettings *settings = RecordingSettings::instance();
-    const bool hide = settings->hideWindowWhileRecording();
-    if (hide) {
-        emit windowHideRequested();
-    }
+    // Without a countdown the window was hidden a moment ago: let the animation finish.
+    const bool justHidden = settings->hideWindowWhileRecording() && settings->countdownSeconds() == 0;
     setState(State::Recording);
 
-    QTimer::singleShot(hide ? kHideDelayMs : 0, this, [this] {
+    QTimer::singleShot(justHidden ? kHideDelayMs : 0, this, [this] {
         if (m_state != State::Recording || m_pipeline.isActive()) {
             return;  // stopped during the delay
         }
