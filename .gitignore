@@ -13,3 +13,6 @@ compile_commands.json
 # Recordings accidentally saved next to the sources
 *.mov
 *.mp4
+
+# Personal CMake presets (e.g. your Qt path)
+CMakeUserPresets.json
