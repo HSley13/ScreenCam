@@ -1,6 +1,9 @@
 // ProjectEditor: the bridge between the editor UI and the project file.
 #include "app/ProjectEditor.hpp"
 
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QtTest>
@@ -117,6 +120,41 @@ private slots:
         QCOMPARE(editor.durationMs(), qint64(30000));
         editor.setDurationMs(29500);
         QCOMPARE(editor.segmentEnd(1), qint64(29500));
+    }
+
+    void exportsNextToTheProjectAndRemembersIt() {
+        if (!ProjectEditor::exportAvailable()) {
+            QSKIP("built without FFmpeg: no export");
+        }
+        const QString sample = qEnvironmentVariable("SCREENCAM_SAMPLE_PROJECT");
+        if (sample.isEmpty()) {
+            QSKIP("run through ctest (needs the make_sample_project fixture)");
+        }
+        // Work on a copy: the export lands beside the project folder.
+        QTemporaryDir dir;
+        const QString folder = dir.filePath("Talk.screencam");
+        QVERIFY(QDir().mkpath(folder));
+        for (const QString &name : QDir(sample).entryList(QDir::Files)) {
+            QVERIFY(QFile::copy(QDir(sample).filePath(name), QDir(folder).filePath(name)));
+        }
+
+        ProjectEditor editor;
+        QVERIFY(editor.open(folder));
+        QCOMPARE(editor.exportPath(), dir.filePath("Talk.mp4"));
+        QSignalSpy done(&editor, &ProjectEditor::exportFinished);
+        QVERIFY(editor.exportVideo());
+        QVERIFY(editor.exporting());
+        QTRY_VERIFY_WITH_TIMEOUT(!done.isEmpty() || !editor.errorText().isEmpty(), 60000);
+        QVERIFY2(editor.errorText().isEmpty(), qPrintable(editor.errorText()));
+        QVERIFY(!editor.exporting());
+        QCOMPARE(editor.lastExport(), dir.filePath("Talk.mp4"));
+        QVERIFY(QFileInfo(editor.lastExport()).size() > 0);
+
+        // Saved in project.json; a second export replaces the first instead of "Talk 2.mp4".
+        editor.close();
+        QVERIFY(editor.open(folder));
+        QCOMPARE(editor.lastExport(), dir.filePath("Talk.mp4"));
+        QCOMPARE(editor.exportPath(), dir.filePath("Talk.mp4"));
     }
 
     void formatsTimeWithTenths() {

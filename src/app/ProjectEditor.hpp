@@ -10,6 +10,8 @@
 #include <QVariantList>
 #include <QtQml/qqmlregistration.h>
 
+class ProjectExporter;
+
 /// The editing model behind the editor page (QML type `ProjectEditor`, one per open project).
 ///
 /// Why a C++ object and not plain QML: the timeline rules (where a cut may go, who inherits a
@@ -43,6 +45,11 @@ class ProjectEditor : public QObject {
     Q_PROPERTY(BubbleStyle *style READ style CONSTANT)
     Q_PROPERTY(bool dirty READ dirty NOTIFY dirtyChanged)
     Q_PROPERTY(QString errorText READ errorText NOTIFY errorTextChanged)
+    // Export (false when built without the FFmpeg development files).
+    Q_PROPERTY(bool exportAvailable READ exportAvailable CONSTANT)
+    Q_PROPERTY(bool exporting READ exporting NOTIFY exportStateChanged)
+    Q_PROPERTY(double exportProgress READ exportProgress NOTIFY exportProgressChanged)
+    Q_PROPERTY(QString lastExport READ lastExport NOTIFY exportStateChanged)
 
 public:
     explicit ProjectEditor(QObject *parent = nullptr);
@@ -74,6 +81,13 @@ public:
     Q_INVOKABLE bool save();
     Q_INVOKABLE void showInFileManager() const;
 
+    /// Renders the finished video next to the project ("<name>.mp4"; re-exporting replaces
+    /// the previous export of this project). Runs in the background.
+    Q_INVOKABLE bool exportVideo();
+    Q_INVOKABLE void cancelExport();
+    /// Opens the exported video in the system's player.
+    Q_INVOKABLE void playLastExport() const;
+
     bool loaded() const { return m_loaded; }
     QString folder() const { return m_project.folder; }
     QString name() const;
@@ -98,6 +112,12 @@ public:
     BubbleStyle *style() const { return m_style; }
     bool dirty() const { return m_dirty; }
     QString errorText() const { return m_errorText; }
+    static bool exportAvailable();
+    bool exporting() const;
+    double exportProgress() const { return m_exportProgress; }
+    QString lastExport() const { return m_project.lastExport; }
+    /// Where exportVideo() will write (exposed for tests).
+    QString exportPath() const;
 
 signals:
     void projectChanged();
@@ -107,6 +127,9 @@ signals:
     void cameraOffsetChanged();
     void dirtyChanged();
     void errorTextChanged();
+    void exportStateChanged();
+    void exportProgressChanged();
+    void exportFinished(const QString &path);
 
 private:
     void loadCurrentStyle();  // segment -> m_style
@@ -123,4 +146,6 @@ private:
     bool m_dirty = false;
     QString m_errorText;
     QTimer m_autosave;
+    ProjectExporter *m_exporter = nullptr;  // created on first export
+    double m_exportProgress = 0.0;
 };

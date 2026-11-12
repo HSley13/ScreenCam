@@ -1,5 +1,9 @@
 #include "app/ProjectEditor.hpp"
 
+#ifdef SCREENCAM_HAS_EXPORT
+#include "export/ProjectExporter.hpp"
+#endif
+
 #include <QDesktopServices>
 #include <QDir>
 #include <QFileInfo>
@@ -69,6 +73,7 @@ void ProjectEditor::close() {
     if (!m_loaded) {
         return;
     }
+    cancelExport();
     if (m_dirty) {
         save();
     }
@@ -317,5 +322,88 @@ void ProjectEditor::setErrorText(const QString &text) {
     if (text != m_errorText) {
         m_errorText = text;
         emit errorTextChanged();
+    }
+}
+
+bool ProjectEditor::exportAvailable() {
+#ifdef SCREENCAM_HAS_EXPORT
+    return true;
+#else
+    return false;
+#endif
+}
+
+bool ProjectEditor::exporting() const {
+#ifdef SCREENCAM_HAS_EXPORT
+    return m_exporter != nullptr && m_exporter->isRunning();
+#else
+    return false;
+#endif
+}
+
+QString ProjectEditor::exportPath() const {
+    if (!m_loaded) {
+        return QString();
+    }
+    if (!m_project.lastExport.isEmpty()) {
+        return m_project.lastExport;  // re-export after more edits: replace it
+    }
+    // "Talk.screencam" -> "Talk.mp4" beside it; "Talk 2.mp4" if that name is taken already.
+    const QFileInfo projectInfo(m_project.folder);
+    const QDir parent = projectInfo.absoluteDir();
+    QString path = parent.filePath(projectInfo.completeBaseName() + QStringLiteral(".mp4"));
+    for (int i = 2; QFileInfo::exists(path); i++) {
+        path = parent.filePath(QStringLiteral("%1 %2.mp4").arg(projectInfo.completeBaseName()).arg(i));
+    }
+    return path;
+}
+
+bool ProjectEditor::exportVideo() {
+#ifdef SCREENCAM_HAS_EXPORT
+    if (!m_loaded || exporting()) {
+        return false;
+    }
+    save();  // the export reads the same state that's on disk
+    if (m_exporter == nullptr) {
+        m_exporter = new ProjectExporter(this);
+        connect(m_exporter, &ProjectExporter::progress, this, [this](double ratio) {
+            m_exportProgress = ratio;
+            emit exportProgressChanged();
+        });
+        connect(m_exporter, &ProjectExporter::finished, this, [this](const QString &path) {
+            m_project.lastExport = path;
+            save();
+            emit exportStateChanged();
+            emit exportFinished(path);
+        });
+        connect(m_exporter, &ProjectExporter::failed, this, [this](const QString &message) {
+            setErrorText(tr("Export failed: %1").arg(message));
+            emit exportStateChanged();
+        });
+        connect(m_exporter, &ProjectExporter::canceled, this, &ProjectEditor::exportStateChanged);
+    }
+    m_exportProgress = 0.0;
+    emit exportProgressChanged();
+    setErrorText(QString());
+    const bool started = m_exporter->start(m_project, exportPath());
+    emit exportStateChanged();
+    return started;
+#else
+    setErrorText(tr("This build of ScreenCam can't export (it was built without FFmpeg)."));
+    return false;
+#endif
+}
+
+void ProjectEditor::cancelExport() {
+#ifdef SCREENCAM_HAS_EXPORT
+    if (m_exporter != nullptr) {
+        m_exporter->cancel();
+    }
+#endif
+}
+
+void ProjectEditor::playLastExport() const {
+    if (!m_project.lastExport.isEmpty()) {
+        QDesktopServices::openUrl(QUrl::fromLocalFile(m_project.lastExport));
     }
 }
