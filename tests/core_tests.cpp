@@ -1,8 +1,13 @@
 // Dependency-free unit tests for the portable core. Run with `ctest --test-dir build`.
+#include <cmath>
+#include <cstdint>
 #include <iostream>
 #include <string>
+#include <vector>
 
+#include "core/BubbleGeometry.hpp"
 #include "core/CameraLayout.hpp"
+#include "core/Nv12.hpp"
 #include "core/EncoderPlan.hpp"
 #include "core/Resolution.hpp"
 #include "core/TimeFormat.hpp"
@@ -19,6 +24,10 @@ void check(bool condition, const char* expression, int line) {
 }
 
 #define CHECK(expr) check((expr), #expr, __LINE__)
+
+bool near(double a, double b, double tolerance = 1e-6) {
+    return std::abs(a - b) <= tolerance;
+}
 
 using namespace screencam::core;
 
@@ -90,6 +99,104 @@ void testFormatElapsed() {
     CHECK(formatElapsed(-5) == "00:00");
 }
 
+
+void testBubbleSize() {
+    const SizeD canvas{1920, 1080};  // short side 1080
+    const SizeD circle = bubbleSize(canvas, BubbleShape::Circle, 0.25);
+    CHECK(near(circle.width, 270) && near(circle.height, 270));
+
+    // Rectangles: long side = 1.25 * 270 = 337.5
+    const SizeD portrait = bubbleSize(canvas, BubbleShape::Portrait, 0.25);
+    CHECK(near(portrait.height, 337.5) && near(portrait.width, 337.5 * 9.0 / 16.0));
+    const SizeD landscape = bubbleSize(canvas, BubbleShape::Landscape, 0.25);
+    CHECK(near(landscape.width, 337.5) && near(landscape.height, 337.5 * 9.0 / 16.0));
+
+    // Size fraction is clamped to [0.08, 0.6].
+    CHECK(near(bubbleSize(canvas, BubbleShape::Circle, 5.0).width, 1080 * 0.6));
+    CHECK(near(bubbleSize(canvas, BubbleShape::Circle, 0.0).width, 1080 * 0.08));
+}
+
+void testCornerRadius() {
+    const SizeD square{200, 200};
+    CHECK(near(bubbleCornerRadius(BubbleShape::Circle, square, 0.0), 100));  // circle ignores roundness
+    CHECK(near(bubbleCornerRadius(BubbleShape::Squircle, square, 0.5), 50));
+    CHECK(near(bubbleCornerRadius(BubbleShape::Portrait, SizeD{90, 160}, 1.0), 45));  // half the short side
+    CHECK(near(bubbleCornerRadius(BubbleShape::Squircle, square, 3.0), 100));  // roundness clamped
+}
+
+void testBubbleRectClamping() {
+    const SizeD canvas{1000, 1000};  // margin = 30
+    // Centred bubble stays centred.
+    const RectD centred = bubbleRect(canvas, BubbleShape::Circle, 0.2, PointD{0.5, 0.5});
+    CHECK(near(centred.x, 400) && near(centred.y, 400) && near(centred.width, 200));
+
+    // Dragged past the bottom-right corner: pushed back inside, 30 px from both edges.
+    const RectD corner = bubbleRect(canvas, BubbleShape::Circle, 0.2, PointD{1.5, 2.0});
+    CHECK(near(corner.x + corner.width, 970) && near(corner.y + corner.height, 970));
+
+    // Dragged past the top-left corner.
+    const RectD topLeft = bubbleRect(canvas, BubbleShape::Circle, 0.2, PointD{-1.0, -1.0});
+    CHECK(near(topLeft.x, 30) && near(topLeft.y, 30));
+}
+
+void testSnapping() {
+    const SizeD canvas{1000, 1000};
+    const SizeD bubble{200, 200};
+    // Bottom-left anchor centre = (30 + 100) / 1000 = 0.13; (1000 - 130) / 1000 = 0.87
+    const PointD nearCorner = snapNormalizedCenter(canvas, bubble, PointD{0.16, 0.84}, 0.05);
+    CHECK(near(nearCorner.x, 0.13) && near(nearCorner.y, 0.87));
+
+    // Close to the middle on x only: snaps x, leaves y alone.
+    const PointD nearMiddle = snapNormalizedCenter(canvas, bubble, PointD{0.52, 0.35}, 0.05);
+    CHECK(near(nearMiddle.x, 0.5) && near(nearMiddle.y, 0.35));
+
+    // Far from every anchor: unchanged.
+    const PointD free = snapNormalizedCenter(canvas, bubble, PointD{0.3, 0.7}, 0.05);
+    CHECK(near(free.x, 0.3) && near(free.y, 0.7));
+}
+
+void testAspectFillCrop() {
+    // 16:9 camera into a circle (1:1): keep full height, cut the sides.
+    const RectD square = aspectFillCrop(SizeD{1920, 1080}, 1.0);
+    CHECK(near(square.x, 420) && near(square.y, 0) && near(square.width, 1080) && near(square.height, 1080));
+
+    // 16:9 camera into a portrait bubble (9:16): 1080 * 9/16 = 607.5 wide.
+    const RectD portrait = aspectFillCrop(SizeD{1920, 1080}, 9.0 / 16.0);
+    CHECK(near(portrait.width, 607.5) && near(portrait.x, (1920 - 607.5) / 2));
+
+    // Portrait source into a landscape bubble: keep full width, cut top and bottom.
+    const RectD landscape = aspectFillCrop(SizeD{1080, 1920}, 16.0 / 9.0);
+    CHECK(near(landscape.width, 1080) && near(landscape.height, 607.5));
+}
+
+void testYuvColours() {
+    const YuvPixel black = rgbToYuv709(0, 0, 0);
+    CHECK(black.y == 16 && black.u == 128 && black.v == 128);
+    const YuvPixel white = rgbToYuv709(255, 255, 255);
+    CHECK(white.y == 235 && white.u == 128 && white.v == 128);
+    const YuvPixel red = rgbToYuv709(255, 0, 0);  // reference BT.709: Y 63, U 102, V 240
+    CHECK(red.y == 63 && red.u == 102 && red.v == 240);
+}
+
+void testNv12Conversion() {
+    // 4x2 image: left half pure red, right half pure blue (0xAARRGGBB words).
+    const int width = 4;
+    const int height = 2;
+    std::vector<std::uint32_t> pixels{0xFFFF0000, 0xFFFF0000, 0xFF0000FF, 0xFF0000FF,
+                                      0xFFFF0000, 0xFFFF0000, 0xFF0000FF, 0xFF0000FF};
+    std::vector<std::uint8_t> yPlane(width * height);
+    std::vector<std::uint8_t> uvPlane(width * height / 2);
+    convertXrgbToNv12(reinterpret_cast<const std::uint8_t *>(pixels.data()), width * 4, width, height, yPlane.data(),
+                      width, uvPlane.data(), width);
+
+    const YuvPixel red = rgbToYuv709(255, 0, 0);
+    const YuvPixel blue = rgbToYuv709(0, 0, 255);
+    CHECK(yPlane[0] == red.y && yPlane[3] == blue.y && yPlane[4] == red.y && yPlane[7] == blue.y);
+    // One UV pair per 2x2 block: block 0 is all red, block 1 all blue.
+    CHECK(uvPlane[0] == red.u && uvPlane[1] == red.v);
+    CHECK(uvPlane[2] == blue.u && uvPlane[3] == blue.v);
+}
+
 }  // namespace
 
 int main() {
@@ -98,6 +205,13 @@ int main() {
     testCameraRecordingSize();
     testEncoderPlan();
     testFormatElapsed();
+    testBubbleSize();
+    testCornerRadius();
+    testBubbleRectClamping();
+    testSnapping();
+    testAspectFillCrop();
+    testYuvColours();
+    testNv12Conversion();
 
     if (g_failures == 0) {
         std::cout << "All core tests passed\n";
