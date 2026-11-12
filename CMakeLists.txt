@@ -100,6 +100,7 @@ if(SCREENCAM_BUILD_APP)
     )
     set(SCREENCAM_QML_FILES
         qml/BubbleSection.qml
+        qml/BubbleView.qml
         qml/CameraBubble.qml
         qml/ControlBar.qml
         qml/CountdownOverlay.qml
