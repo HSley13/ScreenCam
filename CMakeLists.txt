@@ -150,6 +150,12 @@ if(SCREENCAM_BUILD_APP)
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
         MACOSX_BUNDLE_ICON_FILE "ScreenCam.icns")
 
+    if(SCREENCAM_BUILD_TESTS)
+        # Loads the whole QML UI headless and fails on any QML warning.
+        add_test(NAME ui_smoke COMMAND ScreenCam --self-test)
+        set_tests_properties(ui_smoke PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    endif()
+
     # Window/taskbar icon at runtime (all platforms).
     qt_add_resources(ScreenCam "screencam_icon"
         PREFIX "/screencam"
