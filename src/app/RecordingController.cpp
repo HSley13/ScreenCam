@@ -167,6 +167,7 @@ void RecordingController::beginRecording() {
 
         RecordingPipeline::Request request;
         request.compositor.canvasSize = capture->outputSize();
+        request.compositor.sourceCrop = capture->sourceCrop();
         request.compositor.framesPerSecond = settings->frameRate();
         request.compositor.bubble = BubbleStyle::instance()->snapshot();
         switch (settings->mode()) {

@@ -95,17 +95,10 @@ CaptureSources::CaptureSources(QObject *parent)
 
     // Frames may be produced on a media thread; using `this` as context makes Qt deliver
     // them on the main thread, where the QML previews live.
-    connect(&m_screenSink, &QVideoSink::videoFrameChanged, this, [this](const QVideoFrame &frame) {
-        if (!m_screenFrameSeen) {
-            m_screenFrameSeen = true;
-            m_screenWatchdog.stop();
-            if (m_screenError == noScreenPictureMessage()) {
-                setScreenError(QString());
-            }
-        }
-        forward(m_screenPreviews, frame);
-        emit screenFrameArrived(frame);
-    });
+    m_windowSession.setWindowCapture(&m_windowCapture);
+    m_windowSession.setVideoSink(&m_windowSink);
+    connect(&m_screenSink, &QVideoSink::videoFrameChanged, this, &CaptureSources::onTargetFrame);
+    connect(&m_windowSink, &QVideoSink::videoFrameChanged, this, &CaptureSources::onTargetFrame);
     connect(&m_cameraSink, &QVideoSink::videoFrameChanged, this, [this](const QVideoFrame &frame) {
         forward(m_cameraPreviews, frame);
         if (frame.size() != m_cameraResolution && frame.isValid()) {
@@ -117,6 +110,15 @@ CaptureSources::CaptureSources(QObject *parent)
     });
 
     connect(&m_screenCapture, &QScreenCapture::activeChanged, this, &CaptureSources::screenActiveChanged);
+    connect(&m_windowCapture, &QWindowCapture::activeChanged, this, &CaptureSources::screenActiveChanged);
+    connect(&m_windowCapture, &QWindowCapture::errorOccurred, this,
+            [this](QWindowCapture::Error, const QString &message) {
+                if (message.contains(QStringLiteral("ermission"))) {
+                    setScreenError(screenPermissionMessage());
+                } else {
+                    setScreenError(message.isEmpty() ? tr("Window capture failed.") : message);
+                }
+            });
 
     // Without permission (macOS) some backends start "successfully" but never deliver a
     // frame; say so instead of showing an empty preview forever.
@@ -143,7 +145,22 @@ CaptureSources::CaptureSources(QObject *parent)
         updateCamera();
         emit outputSizeChanged();
     });
-    connect(settings, &RecordingSettings::screenIdChanged, this, &CaptureSources::updateScreen);
+    connect(settings, &RecordingSettings::screenIdChanged, this, [this] {
+        updateScreen();
+        emit outputSizeChanged();
+    });
+    connect(settings, &RecordingSettings::captureTargetChanged, this, [this] {
+        if (RecordingSettings::instance()->captureTarget() == RecordingSettings::CaptureTarget::Window &&
+            m_windows.isEmpty()) {
+            refreshWindows();
+        }
+        updateScreen();
+        emit outputSizeChanged();
+    });
+    connect(settings, &RecordingSettings::regionChanged, this, [this] {
+        updateScreen();
+        emit outputSizeChanged();
+    });
     connect(settings, &RecordingSettings::cameraIdChanged, this, &CaptureSources::updateCamera);
     connect(settings, &RecordingSettings::resolutionChanged, this, &CaptureSources::outputSizeChanged);
     connect(settings, &RecordingSettings::cameraOnlyOrientationChanged, this, &CaptureSources::outputSizeChanged);
@@ -176,29 +193,110 @@ void CaptureSources::setRecordingActive(bool active) {
     updateCamera();
 }
 
+void CaptureSources::onTargetFrame(const QVideoFrame &frame) {
+    if (!m_screenFrameSeen) {
+        m_screenFrameSeen = true;
+        m_screenWatchdog.stop();
+        if (m_screenError == noScreenPictureMessage()) {
+            setScreenError(QString());
+        }
+    }
+    // A window's frames define its size (and it can be resized while open).
+    if (m_windowCapture.isActive() && frame.isValid() && frame.size() != m_windowFrameSize) {
+        m_windowFrameSize = frame.size();
+        emit outputSizeChanged();
+    }
+    forward(m_screenPreviews, frame);
+    emit screenFrameArrived(frame);
+}
+
 void CaptureSources::updateScreen() {
     const RecordingSettings *settings = RecordingSettings::instance();
+    const RecordingSettings::CaptureTarget target = settings->captureTarget();
     QScreen *screen = DeviceCatalog::findScreen(settings->screenId());
     if (m_screenCapture.screen() != screen) {
         m_screenCapture.setScreen(screen);
         emit outputSizeChanged();
     }
-    const bool wanted = settings->usesScreen() && wantsInputs() && screen != nullptr;
     if (!m_backendProblem.isEmpty()) {
         // The native backends have no screen capture: don't pretend, explain.
         setScreenError(m_backendProblem);
         m_screenCapture.setActive(false);
+        m_windowCapture.setActive(false);
         return;
     }
-    if (wanted && !m_screenCapture.isActive()) {
+
+    const bool live = settings->usesScreen() && wantsInputs();
+    const bool windowChosen = m_selectedWindow >= 0 && m_selectedWindow < m_windows.size();
+    const bool wantWindow = live && target == RecordingSettings::CaptureTarget::Window && windowChosen;
+    const bool wantScreen = live && target != RecordingSettings::CaptureTarget::Window && screen != nullptr;
+
+    if (live && target == RecordingSettings::CaptureTarget::Window && !windowChosen) {
+        setScreenError(tr("Choose a window to record."));
+    } else if (live && target == RecordingSettings::CaptureTarget::Region && sourceCrop().isEmpty()) {
+        setScreenError(tr("Select the area of the screen to record."));
+    } else if ((wantScreen || wantWindow) && !screenActive()) {
         setScreenError(QString());
         m_screenFrameSeen = false;
         m_screenWatchdog.start();
+    } else if (m_screenError == tr("Choose a window to record.") ||
+               m_screenError == tr("Select the area of the screen to record.")) {
+        setScreenError(QString());
     }
-    if (!wanted) {
+    if (!wantScreen && !wantWindow) {
         m_screenWatchdog.stop();
     }
-    m_screenCapture.setActive(wanted);
+
+    if (wantWindow) {
+        const QCapturableWindow &window = m_windows.at(m_selectedWindow);
+        if (m_windowCapture.window() != window) {
+            m_windowCapture.setWindow(window);
+            m_windowFrameSize = QSize();
+            emit outputSizeChanged();
+        }
+    }
+    m_screenCapture.setActive(wantScreen);
+    m_windowCapture.setActive(wantWindow);
+}
+
+QVariantList CaptureSources::windows() const {
+    QVariantList list;
+    for (int i = 0; i < m_windows.size(); i++) {
+        const QString title = m_windows.at(i).description();
+        list.append(QVariantMap{{QStringLiteral("id"), i},
+                                {QStringLiteral("name"), title.isEmpty() ? tr("Untitled window") : title}});
+    }
+    return list;
+}
+
+void CaptureSources::refreshWindows() {
+    const QString previous =
+        (m_selectedWindow >= 0 && m_selectedWindow < m_windows.size()) ? m_windows.at(m_selectedWindow).description()
+                                                                        : QString();
+    m_windows.clear();
+    for (const QCapturableWindow &window : QWindowCapture::capturableWindows()) {
+        // ScreenCam's own windows (control panel, bubble, ...) are never what you want to record.
+        if (window.isValid() && !window.description().startsWith(QCoreApplication::applicationName())) {
+            m_windows.append(window);
+        }
+    }
+    m_selectedWindow = -1;
+    for (int i = 0; i < m_windows.size(); i++) {
+        if (!previous.isEmpty() && m_windows.at(i).description() == previous) {
+            m_selectedWindow = i;
+        }
+    }
+    emit windowsChanged();
+    updateScreen();
+}
+
+void CaptureSources::setSelectedWindow(int index) {
+    if (index == m_selectedWindow) {
+        return;
+    }
+    m_selectedWindow = index;
+    emit windowsChanged();
+    updateScreen();
 }
 
 void CaptureSources::releaseCamera() {
@@ -247,7 +345,36 @@ void CaptureSources::updateCamera() {
 }
 
 QSize CaptureSources::screenSize() const {
-    return DeviceCatalog::screenPixelSize(DeviceCatalog::findScreen(RecordingSettings::instance()->screenId()));
+    const RecordingSettings *settings = RecordingSettings::instance();
+    switch (settings->captureTarget()) {
+    case RecordingSettings::CaptureTarget::Window:
+        return m_windowFrameSize;  // known once the first frame arrives
+    case RecordingSettings::CaptureTarget::Region: {
+        const QScreen *screen = DeviceCatalog::findScreen(settings->screenId());
+        const QRectF crop = sourceCrop();
+        const QSize full = DeviceCatalog::screenPixelSize(screen);
+        return {qRound(crop.width() * full.width()), qRound(crop.height() * full.height())};
+    }
+    case RecordingSettings::CaptureTarget::Screen:
+        break;
+    }
+    return DeviceCatalog::screenPixelSize(DeviceCatalog::findScreen(settings->screenId()));
+}
+
+QRectF CaptureSources::sourceCrop() const {
+    const RecordingSettings *settings = RecordingSettings::instance();
+    if (settings->captureTarget() != RecordingSettings::CaptureTarget::Region) {
+        return {0.0, 0.0, 1.0, 1.0};
+    }
+    const QScreen *screen = DeviceCatalog::findScreen(settings->screenId());
+    if (screen == nullptr) {
+        return {};
+    }
+    // Region is stored in the screen's logical coordinates; normalize and keep it on screen.
+    const QSizeF size = screen->geometry().size();
+    const QRectF normalized(settings->region().x() / size.width(), settings->region().y() / size.height(),
+                            settings->region().width() / size.width(), settings->region().height() / size.height());
+    return normalized.intersected(QRectF(0.0, 0.0, 1.0, 1.0));
 }
 
 QSize CaptureSources::outputSize() const {
