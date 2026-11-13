@@ -129,6 +129,16 @@ CaptureSources::CaptureSources(QObject *parent)
     });
 
     connect(&m_screenCapture, &QScreenCapture::activeChanged, this, &CaptureSources::screenActiveChanged);
+    connect(&m_excludingCapture, &ExcludingScreenCapture::frameArrived, this, &CaptureSources::onTargetFrame);
+    connect(&m_excludingCapture, &ExcludingScreenCapture::activeChanged, this, &CaptureSources::screenActiveChanged);
+    connect(&m_excludingCapture, &ExcludingScreenCapture::errorOccurred, this,
+            [this](const QString &message, bool permission) {
+                if (permission) {
+                    setScreenError(screenPermissionMessage());
+                } else {
+                    setScreenError(message.isEmpty() ? tr("Screen capture failed.") : message);
+                }
+            });
     connect(&m_windowCapture, &QWindowCapture::activeChanged, this, &CaptureSources::screenActiveChanged);
     connect(&m_windowCapture, &QWindowCapture::errorOccurred, this,
             [this](QWindowCapture::Error, const QString &message) {
@@ -144,7 +154,8 @@ CaptureSources::CaptureSources(QObject *parent)
     m_screenWatchdog.setSingleShot(true);
     m_screenWatchdog.setInterval(kScreenWatchdogMs);
     connect(&m_screenWatchdog, &QTimer::timeout, this, [this] {
-        if (m_screenCapture.isActive() && !m_screenFrameSeen && m_screenError.isEmpty()) {
+        if ((m_screenCapture.isActive() || m_excludingCapture.isActive()) && !m_screenFrameSeen &&
+            m_screenError.isEmpty()) {
             setScreenError(noScreenPictureMessage());
         }
     });
@@ -182,6 +193,10 @@ CaptureSources::CaptureSources(QObject *parent)
     });
     connect(settings, &RecordingSettings::cameraIdChanged, this, &CaptureSources::updateCamera);
     connect(settings, &RecordingSettings::resolutionChanged, this, &CaptureSources::outputSizeChanged);
+    m_excludingCapture.setFramesPerSecond(settings->frameRate());
+    connect(settings, &RecordingSettings::frameRateChanged, this, [this] {
+        m_excludingCapture.setFramesPerSecond(RecordingSettings::instance()->frameRate());
+    });
     connect(settings, &RecordingSettings::cameraOnlyOrientationChanged, this, &CaptureSources::outputSizeChanged);
 
     DeviceCatalog *devices = DeviceCatalog::instance();
@@ -242,7 +257,12 @@ void CaptureSources::updateScreen() {
     const RecordingSettings *settings = RecordingSettings::instance();
     const RecordingSettings::CaptureTarget target = settings->captureTarget();
     QScreen *screen = DeviceCatalog::findScreen(settings->screenId());
-    if (m_screenCapture.screen() != screen) {
+    if (m_useExcludingCapture) {
+        if (m_excludingCapture.screen() != screen) {
+            m_excludingCapture.setScreen(screen);
+            emit outputSizeChanged();
+        }
+    } else if (m_screenCapture.screen() != screen) {
         m_screenCapture.setScreen(screen);
         emit outputSizeChanged();
     }
@@ -250,6 +270,7 @@ void CaptureSources::updateScreen() {
         // The native backends have no screen capture: don't pretend, explain.
         setScreenError(m_backendProblem);
         m_screenCapture.setActive(false);
+        m_excludingCapture.setActive(false);
         m_windowCapture.setActive(false);
         return;
     }
@@ -283,7 +304,8 @@ void CaptureSources::updateScreen() {
             emit outputSizeChanged();
         }
     }
-    m_screenCapture.setActive(wantScreen);
+    m_screenCapture.setActive(wantScreen && !m_useExcludingCapture);
+    m_excludingCapture.setActive(wantScreen && m_useExcludingCapture);
     m_windowCapture.setActive(wantWindow);
     emit targetChanged();  // every choice that changes what's recorded ends up here
 }

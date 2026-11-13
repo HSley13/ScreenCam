@@ -9,6 +9,8 @@
 #include <QRectF>
 #include <QVariantList>
 #include <QScreenCapture>
+
+#include "app/ExcludingScreenCapture.hpp"
 #include <QSize>
 #include <QTimer>
 #include <QVideoFrame>
@@ -66,7 +68,9 @@ public:
     /// Keeps the inputs running while recording, even if the window is hidden.
     void setRecordingActive(bool active);
 
-    bool screenActive() const { return m_screenCapture.isActive() || m_windowCapture.isActive(); }
+    bool screenActive() const {
+        return m_screenCapture.isActive() || m_excludingCapture.isActive() || m_windowCapture.isActive();
+    }
     bool cameraActive() const { return m_camera != nullptr && m_camera->isActive(); }
     QString screenError() const { return m_screenError; }
     QString cameraError() const { return m_cameraError; }
@@ -125,6 +129,10 @@ private:
     // Screen
     QMediaCaptureSession m_screenSession;
     QScreenCapture m_screenCapture;
+    // Used instead of m_screenCapture where available (macOS): records the screen *without*
+    // ScreenCam's own windows — no endless mirror in the preview, no bubble in the video.
+    ExcludingScreenCapture m_excludingCapture;
+    const bool m_useExcludingCapture = ExcludingScreenCapture::isSupported();
     QVideoSink m_screenSink;
     QList<QPointer<QVideoSink>> m_screenPreviews;
     QString m_screenError;

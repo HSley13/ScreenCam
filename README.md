@@ -258,9 +258,18 @@ runs two of these pipelines — screen-only and camera-only — into a project):
 
 The camera bubble you see while recording is a real always-on-top window, so you can see
 yourself and drag it out of the way of what you're showing. But it is **not** recorded as
-part of the screen: ScreenCam's windows are excluded from capture (`NSWindowSharingNone` on
-macOS, `WDA_EXCLUDEFROMCAPTURE` on Windows — `WindowTools`), and the camera is recorded on its
-own track. Its position when you stopped becomes the first part's position in the editor;
+part of the screen: ScreenCam's own windows (main window, bubble, controls, outline) are left
+out of every screen capture, and the camera is recorded on its own track.
+
+- **macOS:** Qt's screen capture (AVCaptureScreenInput) records everything on the display and
+  ignores the per-window "don't share" flag, so ScreenCam captures screens itself with
+  **ScreenCaptureKit**, asking for "this display, minus the ScreenCam app"
+  (`ExcludingScreenCapture_mac.mm`; frames are passed on without copying via a
+  `QAbstractVideoBuffer` around the pixel buffer). Needs macOS 12.3+.
+- **Windows:** each ScreenCam window sets `WDA_EXCLUDEFROMCAPTURE` (`WindowTools`).
+- **Linux:** no way to hide windows from a capture; record a window or a region instead.
+
+Its position when you stopped becomes the first part's position in the editor;
 the final picture is composited at export time. That gives you:
 
 - no "screen inside the screen" loop in the preview,
