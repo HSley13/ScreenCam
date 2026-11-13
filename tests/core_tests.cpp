@@ -1,4 +1,4 @@
-// Dependency-free unit tests for the portable core. Run with `ctest --test-dir build`.
+// Dependency-free unit tests for the portable core.
 #include <cmath>
 #include <cstdint>
 #include <iostream>
@@ -84,7 +84,6 @@ void testFormatElapsed() {
     CHECK(formatElapsed(3723) == "1:02:03");
     CHECK(formatElapsed(-5) == "00:00");
 }
-
 
 void testBubbleSize() {
     const SizeD canvas{1920, 1080};  // short side 1080

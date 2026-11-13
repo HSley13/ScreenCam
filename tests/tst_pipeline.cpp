@@ -70,15 +70,12 @@ private slots:
         QVERIFY(QFileInfo(path).size() > 0);
         qInfo() << "recorded" << path << "dropped frames:" << pipeline.droppedFrames();
 
-        // --- Inspect the file ---------------------------------------------------------
-        // The sink must outlive the player (declared first = destroyed last): the player's
-        // decoding thread may still push a frame into it while being torn down.
+        // Declared first, so it outlives the player: its decoder may still push a frame.
         QVideoSink sink;
         QMediaPlayer player;
         player.setVideoSink(&sink);
         QVideoFrame firstFrame;
-        // Context = the sink (not `this`): frames are queued from the decoder thread, and queued
-        // calls are only dropped when the *context* dies — `this` outlives `firstFrame`.
+        // Context is the sink, not `this`: queued calls are only dropped when the context dies.
         connect(&sink, &QVideoSink::videoFrameChanged, &sink, [&firstFrame](const QVideoFrame &frame) {
             if (!firstFrame.isValid() && frame.isValid()) {
                 firstFrame = frame;
