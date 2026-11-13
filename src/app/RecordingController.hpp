@@ -111,6 +111,7 @@ private:
     State m_state = State::Idle;
     QTimer m_countdownTimer;
     int m_countdownRemaining = 0;
+    QTimer m_pointerTicker;  // samples the mouse pointer for the video (~60x/s)
     QTimer m_elapsedTicker;  // refreshes elapsedText a few times per second
     QElapsedTimer m_clock;
     qint64 m_pausedMs = 0;

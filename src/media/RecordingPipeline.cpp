@@ -195,6 +195,13 @@ void RecordingPipeline::pushCameraImage(const QImage &image) {
     onCompositor([image](FrameCompositor *c) { c->setCameraImage(image); });
 }
 
+void RecordingPipeline::pushPointer(const PointerOverlay &pointer) {
+    if (!m_active) {
+        return;
+    }
+    onCompositor([pointer](FrameCompositor *c) { c->setPointer(pointer); });
+}
+
 void RecordingPipeline::updateBubble(const BubbleStyleSnapshot &bubble) {
     onCompositor([bubble](FrameCompositor *c) { c->setBubble(bubble); });
 }

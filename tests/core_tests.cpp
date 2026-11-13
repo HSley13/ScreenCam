@@ -12,6 +12,7 @@
 #include "core/EncoderPlan.hpp"
 #include "core/Resolution.hpp"
 #include "core/TimeFormat.hpp"
+#include "core/Pointer.hpp"
 #include "core/Timeline.hpp"
 #include "core/WindowFilter.hpp"
 
@@ -286,6 +287,21 @@ void testWindowFilter() {
     CHECK(windowLabel("", "Untitled") == "Untitled");
 }
 
+void testPointerPlacement() {
+    // A 1512 x 982 screen whose top-left is at (100, 50) on the desktop.
+    const RectD screen{100.0, 50.0, 1512.0, 982.0};
+    const PointerPlacement middle = placePointer(PointD{100.0 + 756.0, 50.0 + 491.0}, screen);
+    CHECK(middle.visible);
+    CHECK(std::abs(middle.tip.x - 0.5) < 1e-9);
+    CHECK(std::abs(middle.tip.y - 0.5) < 1e-9);
+    CHECK(std::abs(middle.height - kPointerHeightPoints / 982.0) < 1e-12);
+
+    CHECK(placePointer(PointD{100.0, 50.0}, screen).visible);           // top-left corner
+    CHECK(!placePointer(PointD{99.0, 60.0}, screen).visible);           // just left of it
+    CHECK(!placePointer(PointD{1612.0, 60.0}, screen).visible);         // right edge: next monitor
+    CHECK(!placePointer(PointD{500.0, 500.0}, RectD{}).visible);        // no target
+}
+
 }  // namespace
 
 int main() {
@@ -305,6 +321,7 @@ int main() {
     testAudioLevel();
     testTimeline();
     testWindowFilter();
+    testPointerPlacement();
 
     if (g_failures == 0) {
         std::cout << "All core tests passed\n";

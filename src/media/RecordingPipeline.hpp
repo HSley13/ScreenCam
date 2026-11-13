@@ -55,6 +55,8 @@ public:
     void pushScreenImage(const QImage &image);
     void pushCameraImage(const QImage &image);
     void updateBubble(const BubbleStyleSnapshot &bubble);
+    /// Latest mouse pointer (sampled by the caller a few dozen times per second).
+    void pushPointer(const PointerOverlay &pointer);
 
 signals:
     /// Video time 0 on the monotonic clock (see FrameCompositor::clockStarted).

@@ -29,6 +29,9 @@ class RecordingSettings : public QObject {
     Q_PROPERTY(int countdownSeconds READ countdownSeconds WRITE setCountdownSeconds NOTIFY countdownSecondsChanged)
     Q_PROPERTY(bool hideWindowWhileRecording READ hideWindowWhileRecording WRITE setHideWindowWhileRecording NOTIFY
                    hideWindowWhileRecordingChanged)
+    // The mouse pointer in the video, and a yellow halo around it to point things out.
+    Q_PROPERTY(bool showPointer READ showPointer WRITE setShowPointer NOTIFY showPointerChanged)
+    Q_PROPERTY(bool highlightPointer READ highlightPointer WRITE setHighlightPointer NOTIFY highlightPointerChanged)
     Q_PROPERTY(Orientation cameraOnlyOrientation READ cameraOnlyOrientation WRITE setCameraOnlyOrientation NOTIFY
                    cameraOnlyOrientationChanged)
     Q_PROPERTY(QString outputFolder READ outputFolder NOTIFY outputFolderChanged)
@@ -81,6 +84,10 @@ public:
     void setCountdownSeconds(int seconds);
     bool hideWindowWhileRecording() const { return m_hideWindowWhileRecording; }
     void setHideWindowWhileRecording(bool hide);
+    bool showPointer() const { return m_showPointer; }
+    void setShowPointer(bool show);
+    bool highlightPointer() const { return m_highlightPointer; }
+    void setHighlightPointer(bool highlight);
     Orientation cameraOnlyOrientation() const { return m_cameraOnlyOrientation; }
     void setCameraOnlyOrientation(Orientation orientation);
     QString outputFolder() const { return m_outputFolder; }
@@ -106,6 +113,8 @@ signals:
     void frameRateChanged();
     void countdownSecondsChanged();
     void hideWindowWhileRecordingChanged();
+    void showPointerChanged();
+    void highlightPointerChanged();
     void cameraOnlyOrientationChanged();
     void outputFolderChanged();
 
@@ -127,6 +136,8 @@ private:
     int m_frameRate = 30;
     int m_countdownSeconds = 3;
     bool m_hideWindowWhileRecording = true;
+    bool m_showPointer = true;
+    bool m_highlightPointer = false;
     Orientation m_cameraOnlyOrientation = Orientation::Landscape;
     QString m_outputFolder;
 };

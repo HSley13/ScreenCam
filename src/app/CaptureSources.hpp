@@ -11,6 +11,9 @@
 #include <QScreenCapture>
 
 #include "app/ExcludingScreenCapture.hpp"
+#include "media/FrameCompositor.hpp"
+
+#include <QElapsedTimer>
 #include <QSize>
 #include <QTimer>
 #include <QVideoFrame>
@@ -90,6 +93,10 @@ public:
     /// the menu bar / Dock / taskbar, so the tag isn't hidden under them). Empty for a
     /// window that is minimized or closed, and in Camera-only mode.
     Q_INVOKABLE QRect targetBounds() const;
+    /// Where the mouse pointer goes in the next video frame (see core/Pointer.hpp): only while
+    /// the mouse is over what's recorded and "Show mouse pointer" is on. When the capture
+    /// method already contains the pointer, only the highlight halo is added (if wanted).
+    PointerOverlay pointerOverlay() const;
     /// Briefly marks the current target on the desktop ("Show" buttons; see TargetTag).
     Q_INVOKABLE void identifyTarget() { emit identifyRequested(); }
     /// Size of the video file for the current settings (see computeOutputSize in the .cpp).
@@ -124,6 +131,8 @@ private:
     void releaseCamera();
     bool wantsInputs() const { return m_previewEnabled || m_recordingActive; }
     void setScreenError(const QString &error);
+    bool captureIncludesPointer() const;
+    QRect pointerTargetBounds() const;
     void setCameraError(const QString &error);
 
     // Screen
@@ -146,6 +155,9 @@ private:
     QList<quintptr> m_windowIds;  // native ids, to keep the selection across refreshes
     int m_selectedWindow = -1;
     QSize m_windowFrameSize;
+    // A window's place, re-read at most every 150 ms (the pointer is sampled ~60x/s).
+    mutable QRect m_pointerWindowBounds;
+    mutable QElapsedTimer m_pointerWindowBoundsAge;
     QTimer m_screenWatchdog;  // fires if an active screen capture delivers no frame
     bool m_screenFrameSeen = false;
 

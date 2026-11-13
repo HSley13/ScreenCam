@@ -4,12 +4,14 @@
 #include "app/DeviceCatalog.hpp"
 #include "app/RecordingSettings.hpp"
 #include "core/CameraLayout.hpp"
+#include "core/Pointer.hpp"
 #include "core/Resolution.hpp"
 #include "media/MediaBackendCheck.hpp"
 
 #include <QCameraDevice>
 #include <QCameraFormat>
 #include <QCoreApplication>
+#include <QCursor>
 #include <QJSEngine>
 #include <QScreen>
 
@@ -430,6 +432,63 @@ QRect CaptureSources::targetBounds() const {
     }
     }
     return {};
+}
+
+// Which capture methods put the pointer into the picture themselves.
+bool CaptureSources::captureIncludesPointer() const {
+    if (RecordingSettings::instance()->captureTarget() == RecordingSettings::CaptureTarget::Window) {
+#if defined(Q_OS_WIN)
+        return true;  // Windows Graphics Capture adds it to window captures
+#else
+        return false;  // macOS window pictures and X11 window grabs have none
+#endif
+    }
+    if (m_useExcludingCapture) {
+        return false;  // our ScreenCaptureKit stream leaves it out on purpose
+    }
+#if defined(Q_OS_MACOS)
+    return true;  // Qt's AVCaptureScreenInput (macOS before 12.3) draws it
+#else
+    return false;  // Windows (DXGI) and X11 screen grabs have none
+#endif
+}
+
+// Where the captured picture is on the desktop: the whole screen for screens *and* regions
+// (a region is cropped later, from the full-screen picture), or the window.
+QRect CaptureSources::pointerTargetBounds() const {
+    const RecordingSettings *settings = RecordingSettings::instance();
+    if (settings->captureTarget() == RecordingSettings::CaptureTarget::Window) {
+        if (!m_pointerWindowBoundsAge.isValid() || m_pointerWindowBoundsAge.elapsed() > 150) {
+            m_pointerWindowBounds = targetBounds();
+            m_pointerWindowBoundsAge.start();
+        }
+        return m_pointerWindowBounds;
+    }
+    const QScreen *screen = DeviceCatalog::findScreen(settings->screenId());
+    return screen != nullptr ? screen->geometry() : QRect();
+}
+
+PointerOverlay CaptureSources::pointerOverlay() const {
+    PointerOverlay overlay;
+    const RecordingSettings *settings = RecordingSettings::instance();
+    if (!settings->showPointer() || !settings->usesScreen()) {
+        return overlay;
+    }
+    overlay.arrow = !captureIncludesPointer();
+    overlay.highlight = settings->highlightPointer();
+    if (!overlay.arrow && !overlay.highlight) {
+        return overlay;  // nothing to add
+    }
+    const QRect bounds = pointerTargetBounds();
+    const QPoint mouse = QCursor::pos();
+    const core::PointerPlacement placement =
+        core::placePointer(core::PointD{static_cast<double>(mouse.x()), static_cast<double>(mouse.y())},
+                           core::RectD{static_cast<double>(bounds.x()), static_cast<double>(bounds.y()),
+                                       static_cast<double>(bounds.width()), static_cast<double>(bounds.height())});
+    overlay.visible = placement.visible;
+    overlay.tip = QPointF(placement.tip.x, placement.tip.y);
+    overlay.height = placement.height;
+    return overlay;
 }
 
 void CaptureSources::setSelectedWindow(int index) {

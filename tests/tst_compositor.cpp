@@ -137,6 +137,55 @@ private slots:
         QVERIFY(closeTo(canvas.pixelColor(395, 200), Qt::blue));
     }
 
+    void pointerIsDrawnWhereTheMouseIs() {
+        FrameCompositor compositor;
+        compositor.configure(baseConfig(CompositeLayout::ScreenOnly));  // 640 x 360 canvas
+        compositor.setScreenImage(solid(QSize(1280, 720), Qt::red));
+        PointerOverlay pointer;
+        pointer.visible = true;
+        pointer.tip = QPointF(0.5, 0.5);  // middle of the screen -> (320, 180) on the canvas
+        pointer.height = 0.1;             // 36 px tall on a 360 px canvas
+        compositor.setPointer(pointer);
+
+        QImage canvas = compositor.renderCanvas();
+        // Inside the white arrow, just below and right of its tip.
+        QVERIFY2(closeTo(canvas.pixelColor(323, 200), Qt::white, 30), qPrintable(canvas.pixelColor(323, 200).name()));
+        QVERIFY(closeTo(canvas.pixelColor(300, 180), Qt::red));  // left of the tip: plain screen
+
+        pointer.highlight = true;  // yellow halo around the tip
+        compositor.setPointer(pointer);
+        canvas = compositor.renderCanvas();
+        const QColor halo = canvas.pixelColor(310, 175);
+        QVERIFY2(halo.green() > 40 && halo.red() > 200, qPrintable(halo.name()));
+
+        pointer.visible = false;  // mouse on another monitor
+        compositor.setPointer(pointer);
+        QVERIFY(closeTo(compositor.renderCanvas().pixelColor(323, 200), Qt::red));
+    }
+
+    void pointerFollowsTheRegionCrop() {
+        // Record the right half of an 800 x 400 screen onto a 400 x 400 canvas.
+        CompositorConfig config = baseConfig(CompositeLayout::ScreenOnly);
+        config.canvasSize = QSize(400, 400);
+        config.sourceCrop = QRectF(0.5, 0.0, 0.5, 1.0);
+        FrameCompositor compositor;
+        compositor.configure(config);
+        compositor.setScreenImage(solid(QSize(800, 400), Qt::blue));
+        PointerOverlay pointer;
+        pointer.visible = true;
+        pointer.tip = QPointF(0.75, 0.5);  // middle of the recorded half -> canvas (200, 200)
+        pointer.height = 0.1;
+        compositor.setPointer(pointer);
+        QVERIFY(closeTo(compositor.renderCanvas().pixelColor(203, 222), Qt::white, 30));
+
+        pointer.tip = QPointF(0.25, 0.5);  // in the left half: not recorded, not drawn
+        compositor.setPointer(pointer);
+        const QImage canvas = compositor.renderCanvas();
+        for (int x = 0; x < 400; x += 5) {
+            QVERIFY(closeTo(canvas.pixelColor(x, 220), Qt::blue));
+        }
+    }
+
     void differentlyShapedSourceIsLetterboxed() {
         // A square window recorded into a 640x360 canvas: centred, black bars left and right.
         FrameCompositor compositor;
