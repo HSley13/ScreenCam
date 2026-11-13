@@ -8,7 +8,7 @@ project(ScreenCam
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-# Lets clangd (nvim) understand the project: it reads build/compile_commands.json.
+# For clangd.
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -20,8 +20,7 @@ option(SCREENCAM_BUILD_TESTS "Build the unit tests" ON)
 option(SCREENCAM_ENABLE_EXPORT "Video export from the editor (needs the FFmpeg development files)" ON)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
-# Sources are UTF-8 (labels like "Safari — GitHub", "▸"); MSVC would otherwise read them in
-# the system's code page and garble those strings.
+# Sources are UTF-8 ("—", "▸"); MSVC would read them in the system's code page.
 add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
 
 if(MSVC)
@@ -30,9 +29,7 @@ else()
     set(SCREENCAM_WARNINGS -Wall -Wextra -Wpedantic)
 endif()
 
-# ---------------------------------------------------------------------------
-# Portable core: plain C++20, no Qt -> geometry, sizes, pixel conversion.
-# ---------------------------------------------------------------------------
+# Portable core: plain C++20, no Qt.
 add_library(screencam_core STATIC
     src/core/AudioLevel.cpp
     src/core/BubbleGeometry.cpp
@@ -54,16 +51,13 @@ if(SCREENCAM_BUILD_TESTS)
     add_test(NAME core_tests COMMAND core_tests)
 endif()
 
-# ---------------------------------------------------------------------------
-# Qt application: C++ backend (capture, compositing, encoding) + QML front end.
-# ---------------------------------------------------------------------------
+# The Qt app.
 if(SCREENCAM_BUILD_APP)
     find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Widgets Qml Quick QuickControls2 Multimedia)
     qt_standard_project_setup(REQUIRES 6.8)
 
-    # Screen capture (QScreenCapture) and recording composited frames (QVideoFrameInput) only
-    # exist in Qt Multimedia's FFmpeg backend. Qt builds without it (Homebrew's, or Qt compiled
-    # from source without -ffmpeg-dir) build fine but show an empty screen preview at runtime.
+    # Screen capture and QVideoFrameInput need Qt Multimedia's FFmpeg backend; a Qt without it
+    # builds fine but shows an empty preview.
     if(NOT TARGET Qt6::QFFmpegMediaPlugin)
         message(WARNING
             "The Qt found at ${Qt6_DIR} has no FFmpeg multimedia backend (Qt6::QFFmpegMediaPlugin).\n"
@@ -72,7 +66,7 @@ if(SCREENCAM_BUILD_APP)
             "See README.md > Troubleshooting.")
     endif()
 
-    # Media library: compositing + encoding, Qt-only (no QML) so the tests can link it.
+    # Compositing + encoding, without QML, so the tests can link it.
     add_library(screencam_media STATIC
         src/media/BubbleStyleSnapshot.cpp src/media/BubbleStyleSnapshot.hpp
         src/media/FrameCompositor.cpp src/media/FrameCompositor.hpp
@@ -85,9 +79,7 @@ if(SCREENCAM_BUILD_APP)
     target_link_libraries(screencam_media PUBLIC screencam_core Qt6::Gui Qt6::Multimedia)
     target_compile_options(screencam_media PRIVATE ${SCREENCAM_WARNINGS})
 
-    # Export library: turns an edited project into a finished MP4 by talking to FFmpeg's
-    # libraries directly (decode -> composite -> encode, faster than real time). Optional:
-    # without the FFmpeg headers the app still records and edits, it just can't export.
+    # Export uses FFmpeg's libraries directly. Optional: without them the app can't export.
     set(SCREENCAM_HAS_EXPORT OFF)
     if(SCREENCAM_ENABLE_EXPORT)
         find_package(FFmpeg 59)  # libavcodec 59 = FFmpeg 5.0
@@ -102,7 +94,6 @@ if(SCREENCAM_BUILD_APP)
         target_link_libraries(screencam_export PUBLIC
             screencam_media FFmpeg::avformat FFmpeg::avcodec FFmpeg::swscale FFmpeg::avutil)
         target_compile_options(screencam_export PRIVATE ${SCREENCAM_WARNINGS})
-        # Whoever links the exporter (the app, tests) gets the define that turns export on.
         target_compile_definitions(screencam_export PUBLIC SCREENCAM_HAS_EXPORT)
         message(STATUS "Video export: ON (FFmpeg ${FFmpeg_VERSION} in ${FFmpeg_INCLUDE_DIR})")
     elseif(SCREENCAM_ENABLE_EXPORT)
@@ -114,7 +105,7 @@ if(SCREENCAM_BUILD_APP)
 
     if(SCREENCAM_BUILD_TESTS)
         find_package(Qt6 REQUIRED COMPONENTS Test)
-        # Media tests run without a display (offscreen platform) so they also work in CI.
+        # Offscreen, so they run without a display.
         function(screencam_add_qt_test name)
             qt_add_executable(${name} tests/${name}.cpp)
             target_link_libraries(${name} PRIVATE screencam_media Qt6::Test)
@@ -127,7 +118,7 @@ if(SCREENCAM_BUILD_APP)
         screencam_add_qt_test(tst_project)
         screencam_add_qt_test(tst_recording_index)
 
-        # A tiny real project (synthetic screen + camera) that the editor and export tests open.
+        # A tiny real project for the editor and export tests.
         qt_add_executable(make_sample_project tests/make_sample_project.cpp)
         target_link_libraries(make_sample_project PRIVATE screencam_media)
         set(SCREENCAM_SAMPLE_PROJECT ${CMAKE_CURRENT_BINARY_DIR}/test-data/Sample.screencam)
@@ -192,8 +183,7 @@ if(SCREENCAM_BUILD_APP)
     )
     set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
-    # Platform icons: .icns inside the macOS bundle, .rc/.ico for the Windows .exe.
-    set(SCREENCAM_PLATFORM_FILES)
+    set(SCREENCAM_PLATFORM_FILES)  # icons
     if(APPLE)
         set(SCREENCAM_PLATFORM_FILES ${CMAKE_CURRENT_SOURCE_DIR}/packaging/macos/ScreenCam.icns)
         set_source_files_properties(${SCREENCAM_PLATFORM_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
@@ -201,18 +191,14 @@ if(SCREENCAM_BUILD_APP)
         set(SCREENCAM_PLATFORM_FILES ${CMAKE_CURRENT_SOURCE_DIR}/packaging/windows/ScreenCam.rc)
     endif()
 
-    # Native window code: hiding our own windows from capture (WindowTools) and listing
-    # the real app windows for "Record ▸ Window" (AppWindows).
     set(SCREENCAM_PLATFORM_LIBS)
     if(APPLE)
         enable_language(OBJCXX)  # these .mm files talk to AppKit (NSWindow, NSRunningApplication)
         list(APPEND SCREENCAM_PLATFORM_FILES
             src/app/WindowTools_mac.mm src/app/AppWindows_mac.mm src/app/ExcludingScreenCapture_mac.mm)
-        # ScreenCaptureKit (macOS 12.3+) is weak-linked: the app still starts on 12.0-12.2 and
-        # falls back to Qt's screen capture there.
+        # ScreenCaptureKit (12.3+) is weak-linked: 12.0-12.2 fall back to Qt's screen capture.
         list(APPEND SCREENCAM_PLATFORM_LIBS "-framework AppKit" "-framework CoreGraphics" "-framework CoreMedia"
                                             "-framework CoreVideo" "-weak_framework ScreenCaptureKit")
-        # Automatic reference counting for the ScreenCaptureKit code (streams, outputs, blocks).
         set_source_files_properties(src/app/ExcludingScreenCapture_mac.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
     elseif(WIN32)
         list(APPEND SCREENCAM_PLATFORM_FILES src/app/AppWindows_win.cpp src/app/ExcludingScreenCapture_other.cpp)
@@ -231,11 +217,8 @@ if(SCREENCAM_BUILD_APP)
     qt_add_executable(ScreenCam WIN32 MACOSX_BUNDLE src/app/main.cpp ${SCREENCAM_PLATFORM_FILES})
     target_link_libraries(ScreenCam PRIVATE ${SCREENCAM_PLATFORM_LIBS})
 
-    # The native id inside a QCapturableWindow (to match it with the OS's window list) is
-    # only reachable through Qt Multimedia's private header. Qt 6.9+ ships private targets
-    # as a separate package; in 6.8 Qt6::MultimediaPrivate comes with Multimedia.
-    # (We use one small, stable struct from it — unchanged from 6.8 to 6.12 — and fall back to
-    # Qt's unfiltered list without it, hence the warning is switched off.)
+    # A QCapturableWindow's native id is only in Qt Multimedia's private header (one small
+    # struct, stable from 6.8 to 6.12); without it the window list is unfiltered.
     set(QT_NO_PRIVATE_MODULE_WARNING ON)
     find_package(Qt6 QUIET OPTIONAL_COMPONENTS MultimediaPrivate)
     if(TARGET Qt6::MultimediaPrivate)
@@ -248,10 +231,9 @@ if(SCREENCAM_BUILD_APP)
     qt_add_qml_module(ScreenCam
         URI ScreenCam
         VERSION 1.0
-        # Keep the module's generated files out of the way of the "ScreenCam" executable,
-        # which would otherwise collide with a "ScreenCam/" directory in the build tree.
+        # A "ScreenCam/" folder would collide with the executable.
         OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/qml/ScreenCam
-        # C++ types use QtQuick value types (color, size, rect): tell the tooling about it.
+        # C++ types use QtQuick value types (color, size, rect).
         DEPENDENCIES QtQuick
         QML_FILES ${SCREENCAM_QML_FILES}
         RESOURCES
@@ -259,7 +241,7 @@ if(SCREENCAM_BUILD_APP)
             qml/icons/tray-recording.png
         SOURCES ${SCREENCAM_APP_SOURCES}
     )
-    # src/app too: the generated QML type registrations include the headers by file name.
+    # The generated QML type registrations include headers by file name.
     target_include_directories(ScreenCam PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/src/app)
     target_compile_definitions(ScreenCam PRIVATE SCREENCAM_VERSION="${PROJECT_VERSION}")
     # Debug builds reload the UI when a .qml file is saved (see QmlHotReloader).
@@ -280,7 +262,6 @@ if(SCREENCAM_BUILD_APP)
         Qt6::Multimedia)
 
     set_target_properties(ScreenCam PROPERTIES
-        # macOS: camera/microphone usage strings live in this Info.plist template.
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Info.plist.in"
         MACOSX_BUNDLE_GUI_IDENTIFIER "com.hsley13.screencam"
         MACOSX_BUNDLE_BUNDLE_NAME "ScreenCam"
@@ -288,11 +269,8 @@ if(SCREENCAM_BUILD_APP)
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
         MACOSX_BUNDLE_ICON_FILE "ScreenCam.icns")
 
-    # macOS remembers Camera / Microphone / Screen Recording permission per *code signature*.
-    # The linker's automatic ad-hoc signature is a hash of the binary, so every rebuild looks
-    # like a new app and the permission you granted no longer applies. Sign every build with one
-    # fixed identity instead (scripts/create-macos-signing-identity.sh creates
-    # "ScreenCam Development" once); ad hoc ("-") is only the fallback.
+    # macOS ties permissions to the code signature, and an ad-hoc one changes with every
+    # build: sign with the fixed "ScreenCam Development" identity when it exists.
     if(APPLE)
         set(SCREENCAM_SIGNING_NAME "ScreenCam Development")
         execute_process(COMMAND security find-identity -v -p codesigning
@@ -304,7 +282,6 @@ if(SCREENCAM_BUILD_APP)
         endif()
         set(SCREENCAM_CODESIGN_IDENTITY "${_screencam_found_identity}" CACHE STRING
             "codesign identity for ScreenCam.app ('-' = ad hoc)")
-        # Upgrade an earlier ad-hoc choice once the identity exists.
         if(SCREENCAM_CODESIGN_IDENTITY STREQUAL "-" AND NOT _screencam_found_identity STREQUAL "-")
             set(SCREENCAM_CODESIGN_IDENTITY "${_screencam_found_identity}" CACHE STRING
                 "codesign identity for ScreenCam.app ('-' = ad hoc)" FORCE)
@@ -330,7 +307,7 @@ if(SCREENCAM_BUILD_APP)
         add_test(NAME ui_smoke COMMAND ScreenCam --self-test)
         set_tests_properties(ui_smoke PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
-        # The editor's model, built from the app sources it needs (they aren't a library).
+        # Built from the app sources it needs (they aren't a library).
         qt_add_executable(tst_project_editor tests/tst_project_editor.cpp
             src/app/ProjectEditor.cpp src/app/BubbleStyle.cpp)
         target_include_directories(tst_project_editor PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -343,7 +320,7 @@ if(SCREENCAM_BUILD_APP)
             set_tests_properties(tst_project_editor PROPERTIES FIXTURES_REQUIRED sample_project)
         endif()
 
-        # Window picker on Linux/X11, against a fake desktop on a virtual X server.
+        # Against a fake desktop on a virtual X server.
         find_program(SCREENCAM_XVFB_RUN xvfb-run)
         if(X11_FOUND AND SCREENCAM_XVFB_RUN AND TARGET Qt6::MultimediaPrivate)
             qt_add_executable(tst_app_windows tests/tst_app_windows.cpp src/app/AppWindows_x11.cpp)
@@ -354,24 +331,17 @@ if(SCREENCAM_BUILD_APP)
             set_tests_properties(tst_app_windows PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=xcb")
         endif()
 
-        # Editor smoke test: opens the sample project (see make_sample_project above).
         add_test(NAME ui_smoke_editor COMMAND ScreenCam --self-test --open ${SCREENCAM_SAMPLE_PROJECT})
         set_tests_properties(ui_smoke_editor PROPERTIES
             ENVIRONMENT "QT_QPA_PLATFORM=offscreen" FIXTURES_REQUIRED sample_project)
     endif()
 
-    # Window/taskbar icon at runtime (all platforms).
     qt_add_resources(ScreenCam "screencam_icon"
         PREFIX "/screencam"
         BASE "packaging/icons"
         FILES packaging/icons/screencam.png)
 
-    # -----------------------------------------------------------------------
-    # Install + deploy:  cmake --install build --prefix <dir>
-    # Produces a self-contained app: Qt libraries, plugins (incl. the FFmpeg
-    # multimedia backend) and QML modules are copied next to the executable by
-    # Qt's deploy tooling (macdeployqt / windeployqt / Linux deploy).
-    # -----------------------------------------------------------------------
+    # cmake --install build --prefix <dir>: a self-contained app (Qt's deploy tooling).
     include(GNUInstallDirs)
     install(TARGETS ScreenCam
         BUNDLE DESTINATION .
@@ -384,8 +354,7 @@ if(SCREENCAM_BUILD_APP)
     install(SCRIPT ${screencam_deploy_script})
 
     if(APPLE)
-        # Deployment rewrites the binaries, which breaks their signature: re-sign the whole
-        # bundle (with the same identity as the build, so granted permissions carry over).
+        # Deploying breaks the signature: re-sign with the build's identity.
         install(CODE "execute_process(COMMAND codesign --force --deep --sign \"${SCREENCAM_CODESIGN_IDENTITY}\" --identifier com.hsley13.screencam \"\${CMAKE_INSTALL_PREFIX}/ScreenCam.app\")")
     elseif(UNIX)
         install(FILES packaging/linux/screencam.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
@@ -393,8 +362,7 @@ if(SCREENCAM_BUILD_APP)
             DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/512x512/apps)
     endif()
 
-    # Packages:  cmake --build build --target package
-    #   macOS -> .dmg (drag to Applications), Windows -> .zip, Linux -> .tar.gz
+    # --target package: .dmg, .zip or .tar.gz
     set(CPACK_PACKAGE_NAME "ScreenCam")
     set(CPACK_PACKAGE_VENDOR "hsley13")
     set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
