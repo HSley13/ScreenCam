@@ -21,10 +21,8 @@ namespace core = screencam::core;
 
 namespace {
 
-/// Encoders to try, best first. Hardware encoders are fast and always present on their
-/// platform (VideoToolbox on macOS, Media Foundation on Windows); libx264 is the quality
-/// software choice when FFmpeg was built with it; mpeg4 is built into every FFmpeg, so an
-/// export never fails just for lack of an H.264 encoder.
+/// Best first: the platform's hardware encoder, libx264 if built in, and mpeg4, which every
+/// FFmpeg has, so an export never fails for lack of an H.264 encoder.
 std::vector<const char *> encoderCandidates(bool needsHevc) {
     std::vector<const char *> names;
     if (needsHevc) {
@@ -36,7 +34,6 @@ std::vector<const char *> encoderCandidates(bool needsHevc) {
     return names;
 }
 
-/// NV12 when the encoder takes it (our converter writes it directly), else YUV420P.
 AVPixelFormat pickPixelFormat(const AVCodec *codec) {
     const AVPixelFormat *formats = nullptr;
 #if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 13, 100)
@@ -49,7 +46,7 @@ AVPixelFormat pickPixelFormat(const AVCodec *codec) {
     formats = codec->pix_fmts;
 #endif
     if (formats == nullptr) {
-        return AV_PIX_FMT_YUV420P;  // "anything": the common denominator
+        return AV_PIX_FMT_YUV420P;
     }
     bool hasYuv420p = false;
     for (const AVPixelFormat *format = formats; *format != AV_PIX_FMT_NONE; format++) {
@@ -68,8 +65,7 @@ struct OpenedEncoder {
     QString name;
 };
 
-/// Opens the first candidate encoder that accepts our settings. `globalHeader`: MP4 wants
-/// the codec setup (SPS/PPS) in the file header rather than repeated in the stream.
+/// `globalHeader`: MP4 wants the codec setup (SPS/PPS) in the file header.
 OpenedEncoder openEncoder(const Project &project, bool globalHeader) {
     const core::PixelSize size{project.canvasSize.width(), project.canvasSize.height()};
     const core::EncoderPlan plan = core::planEncoder(size, project.framesPerSecond);
@@ -90,8 +86,7 @@ OpenedEncoder openEncoder(const Project &project, bool globalHeader) {
         context->framerate = AVRational{project.framesPerSecond, 1};
         context->bit_rate = plan.averageBitRate;
         context->gop_size = plan.maxKeyFrameInterval;
-        // Tag the colours the way core/Nv12 produces them, so players don't guess (BT.709,
-        // video range) and show washed-out or too-dark pictures.
+        // Tag the colours as core/Nv12 writes them, or players guess and look washed out.
         context->colorspace = AVCOL_SPC_BT709;
         context->color_primaries = AVCOL_PRI_BT709;
         context->color_trc = AVCOL_TRC_BT709;
@@ -105,12 +100,11 @@ OpenedEncoder openEncoder(const Project &project, bool globalHeader) {
         if (avcodec_open2(context.get(), codec, nullptr) >= 0) {
             return {std::move(context), QString::fromLatin1(name)};
         }
-        // Present but unusable here (no GPU, size unsupported ...): try the next one.
+        // Present but unusable here (no GPU, size unsupported, ...).
     }
     return {};
 }
 
-/// Writes the canvas into the encoder's frame: NV12 directly, or NV12 then split for YUV420P.
 void fillFrame(const QImage &canvas, AVFrame *frame, std::vector<uint8_t> &uvScratch) {
     const int width = frame->width;
     const int height = frame->height;
@@ -119,7 +113,7 @@ void fillFrame(const QImage &canvas, AVFrame *frame, std::vector<uint8_t> &uvScr
                                 frame->data[0], frame->linesize[0], frame->data[1], frame->linesize[1]);
         return;
     }
-    // YUV420P keeps U and V in separate planes; NV12 interleaves them (UVUV...).
+    // YUV420P: NV12's interleaved UV split into two planes.
     const int chromaWidth = (width + 1) / 2;
     const int chromaHeight = (height + 1) / 2;
     uvScratch.resize(static_cast<std::size_t>(chromaWidth) * 2 * static_cast<std::size_t>(chromaHeight));
@@ -136,9 +130,8 @@ void fillFrame(const QImage &canvas, AVFrame *frame, std::vector<uint8_t> &uvScr
     }
 }
 
-/// The output file being written. Until commit(), it lives under a temporary ".part" name and
-/// is deleted again on any early return (error or cancel), so a failed export never leaves a
-/// broken file behind or replaces a previous good export.
+/// Written under a ".part" name until commit() and deleted on any early return, so a failed
+/// export never leaves a broken file or replaces a good one.
 class Muxer {
 public:
     explicit Muxer(const QString &finalPath)
@@ -154,7 +147,7 @@ public:
 
     const QString &partialPath() const { return m_partialPath; }
 
-    /// Frees FFmpeg's state and closes the file (Windows can't delete or rename open files).
+    /// Windows can't delete or rename open files.
     void close() {
         if (m_output == nullptr) {
             return;
@@ -166,7 +159,6 @@ public:
         m_output = nullptr;
     }
 
-    /// Gives the finished file its real name.
     bool commit() {
         close();
         QFile::remove(m_finalPath);
@@ -182,7 +174,7 @@ private:
     bool m_committed = false;
 };
 
-/// Audio from screen.mp4, copied packet by packet (it is already AAC: no quality loss).
+/// screen.mp4's audio, copied packet by packet (already AAC: no quality loss).
 struct AudioCopy {
     InputPtr input;
     int inputStream = -1;
@@ -211,7 +203,7 @@ struct AudioCopy {
         return true;
     }
 
-    /// Writes audio packets up to `untilMs` so audio and video stay interleaved in the file.
+    /// Up to `untilMs`, so audio and video stay interleaved in the file.
     int writeUntil(AVFormatContext *output, qint64 untilMs) {
         if (outputStream == nullptr) {
             return 0;
@@ -246,7 +238,7 @@ struct AudioCopy {
     }
 };
 
-/// Sends one frame (or nullptr = flush) to the encoder and writes whatever comes out.
+/// `frame` nullptr flushes.
 int encodeAndWrite(AVCodecContext *encoder, const AVFrame *frame, AVFormatContext *output, AVStream *stream,
                    AVPacket *packet) {
     int result = avcodec_send_frame(encoder, frame);
@@ -298,7 +290,6 @@ QString ProjectExporter::exportProject(const Project &project, const QString &ou
     }
     const bool withCamera = !project.cameraFile.isEmpty();
 
-    // --- Inputs ---------------------------------------------------------------------------
     QString error;
     VideoFileReader screen;
     if (!screen.open(project.screenPath(), &error)) {
@@ -309,7 +300,6 @@ QString ProjectExporter::exportProject(const Project &project, const QString &ou
         return QStringLiteral("Couldn't read the camera recording: %1").arg(error);
     }
 
-    // --- Output file ----------------------------------------------------------------------
     Muxer muxer(outputPath);
     const QString &partialPath = muxer.partialPath();
     int result = avformat_alloc_output_context2(&muxer.m_output, nullptr, "mp4", partialPath.toUtf8().constData());
@@ -328,14 +318,13 @@ QString ProjectExporter::exportProject(const Project &project, const QString &ou
     videoStream->avg_frame_rate = encoder.context->framerate;
 
     AudioCopy audio;
-    audio.open(project.screenPath(), output);  // no audio stream is fine: silent video
+    audio.open(project.screenPath(), output);  // none is fine: silent video
 
     result = avio_open(&output->pb, partialPath.toUtf8().constData(), AVIO_FLAG_WRITE);
     if (result < 0) {
         return QStringLiteral("Couldn't create %1: %2").arg(partialPath, errorText(result));
     }
-    // "faststart": move the index to the front so the video starts playing before it has
-    // fully downloaded (when shared on the web). Costs one extra pass at the end.
+    // "faststart": index at the front, so the video plays before it has fully downloaded.
     AVDictionary *options = nullptr;
     av_dict_set(&options, "movflags", "+faststart", 0);
     result = avformat_write_header(output, &options);
@@ -344,7 +333,6 @@ QString ProjectExporter::exportProject(const Project &project, const QString &ou
         return errorText(result);
     }
 
-    // --- Frames ---------------------------------------------------------------------------
     FrameCompositor compositor;
     CompositorConfig config;
     config.canvasSize = project.canvasSize;
@@ -373,11 +361,10 @@ QString ProjectExporter::exportProject(const Project &project, const QString &ou
 
         compositor.setScreenImage(screen.imageAt(timeMs));
         if (withCamera && segment.cameraVisible) {
-            // The camera file started cameraOffsetMs after the screen file.
             compositor.setCameraImage(camera.imageAt(std::max<qint64>(0, timeMs - project.cameraOffsetMs)));
             compositor.setBubble(segment.style);
         } else {
-            compositor.setCameraImage(QImage());  // no camera image = no bubble
+            compositor.setCameraImage(QImage());  // no bubble
         }
         const QImage canvas = compositor.renderCanvas();
 
@@ -400,7 +387,6 @@ QString ProjectExporter::exportProject(const Project &project, const QString &ou
         }
     }
 
-    // --- Finish -----------------------------------------------------------------------------
     result = encodeAndWrite(encoder.context.get(), nullptr, output, videoStream, packet.get());  // flush
     if (result >= 0) {
         result = audio.writeUntil(output, project.durationMs + 1000);  // audio tail
@@ -422,8 +408,7 @@ bool ProjectExporter::start(const Project &project, const QString &outputPath) {
         return false;
     }
     m_cancel = false;
-    // The worker only touches its own copy of the project and reports back through queued
-    // signals (this object lives on the UI thread).
+    // The worker uses its own copy of the project and reports through queued signals.
     m_thread.reset(QThread::create([this, project, outputPath] {
         int lastPercent = -1;
         const QString error = exportProject(project, outputPath, [this, &lastPercent](double ratio) {
@@ -449,7 +434,7 @@ bool ProjectExporter::start(const Project &project, const QString &outputPath) {
             },
             Qt::QueuedConnection);
     }));
-    m_thread->start(QThread::LowPriority);  // keep the UI and other apps responsive
+    m_thread->start(QThread::LowPriority);
     return true;
 }
 

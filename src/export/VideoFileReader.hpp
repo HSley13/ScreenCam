@@ -5,18 +5,14 @@
 #include <QImage>
 #include <QString>
 
-/// Decodes one video file front to back and answers "what picture is showing at time t?".
-///
-/// The exporter walks the timeline in steady steps (1/30 s ...) while the file's own frames
-/// may come at a slightly different, uneven rate. So instead of "give me frame n", it asks
-/// imageAt(t): the latest frame whose timestamp is <= t — exactly what a player would show.
-/// Times only go forward, so the file is decoded once, sequentially (no seeking).
+/// "Which picture shows at time t?" — the latest frame at or before t, as a player would show
+/// it, since the file's frame rate may be uneven. Times only go forward, so the file is
+/// decoded once, front to back.
 class VideoFileReader {
 public:
     bool open(const QString &path, QString *error);
 
-    /// The picture showing at `timeMs` (RGB32). Before the first frame: the first frame;
-    /// after the last: the last one. Calls must use non-decreasing times.
+    /// RGB32; clamps to the first and last frame. Times must not decrease.
     const QImage &imageAt(qint64 timeMs);
 
 private:
@@ -32,7 +28,7 @@ private:
     bool m_draining = false;  // the demuxer is done; the decoder hands out what it buffered
     bool m_finished = false;
 
-    bool m_hasPending = false;  // m_frame holds a decoded frame not yet turned into m_current
+    bool m_hasPending = false;  // m_frame not yet turned into m_current
     qint64 m_pendingMs = 0;
     QImage m_current;
 };

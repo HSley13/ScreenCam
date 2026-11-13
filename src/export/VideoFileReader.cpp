@@ -28,7 +28,7 @@ bool VideoFileReader::open(const QString &path, QString *error) {
     }
     m_decoder.reset(avcodec_alloc_context3(codec));
     avcodec_parameters_to_context(m_decoder.get(), input->streams[m_stream]->codecpar);
-    m_decoder->thread_count = 0;  // 0 = as many threads as makes sense
+    m_decoder->thread_count = 0;  // automatic
     result = avcodec_open2(m_decoder.get(), codec, nullptr);
     if (result < 0) {
         *error = errorText(result);
@@ -59,8 +59,6 @@ bool VideoFileReader::decodeNext() {
     if (m_finished) {
         return false;
     }
-    // FFmpeg's decode loop: ask for a frame; if the decoder needs more input, feed it the
-    // next packet of our stream; at the end of the file send "nullptr" to flush it.
     while (true) {
         int result = avcodec_receive_frame(m_decoder.get(), m_frame.get());
         if (result == 0) {
@@ -102,7 +100,7 @@ void VideoFileReader::convertPending() {
         sws_setColorspaceDetails(m_scale.get(), source, fullRange ? 1 : 0, sws_getCoefficients(SWS_CS_DEFAULT), 1, 0,
                                  1 << 16, 1 << 16);
 
-        // AV_PIX_FMT_RGB32 is native-endian 0xAARRGGBB words: the same layout as QImage's.
+        // AV_PIX_FMT_RGB32 has QImage's layout (native-endian 0xAARRGGBB).
         QImage image(frame->width, frame->height, QImage::Format_RGB32);
         uint8_t *destination[4] = {image.bits(), nullptr, nullptr, nullptr};
         const int destinationStride[4] = {static_cast<int>(image.bytesPerLine()), 0, 0, 0};
