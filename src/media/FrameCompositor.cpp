@@ -4,6 +4,7 @@
 #include "core/Nv12.hpp"
 
 #include <QPainter>
+#include <QPolygonF>
 #include <QPainterPath>
 #include <QTimer>
 #include <QVideoFrameFormat>
@@ -132,25 +133,70 @@ QImage FrameCompositor::renderCanvas() {
     }
 
     drawScreen(painter, QRectF(canvas.rect()));
+    drawPointer(painter, QRectF(canvas.rect()));  // under the bubble, like on the desktop
     if (m_config.layout == CompositeLayout::ScreenWithBubble && !m_cameraImage.isNull()) {
         drawBubble(painter);
     }
     return canvas;
 }
 
+QRectF FrameCompositor::screenTargetRect(const QRectF &canvas, QRectF *crop) const {
+    // 1) The part of the frame to record (all of it, or the selected region).
+    *crop = m_config.sourceCrop.isValid() ? m_config.sourceCrop : QRectF(0.0, 0.0, 1.0, 1.0);
+    // 2) Fit it into the canvas. Screens and regions already have the canvas's aspect ratio, so
+    //    this fills it; a window resized mid-recording gets black bars instead of being stretched.
+    const core::RectD fit = core::aspectFitRect(
+        core::SizeD{crop->width() * m_screenImage.width(), crop->height() * m_screenImage.height()},
+        core::SizeD{canvas.width(), canvas.height()});
+    return QRectF(canvas.x() + fit.x, canvas.y() + fit.y, fit.width, fit.height);
+}
+
 void FrameCompositor::drawScreen(QPainter &painter, const QRectF &canvas) const {
     if (m_screenImage.isNull()) {
         return;
     }
-    // 1) The part of the frame to record (all of it, or the selected region).
-    const QRectF crop = m_config.sourceCrop.isValid() ? m_config.sourceCrop : QRectF(0.0, 0.0, 1.0, 1.0);
+    QRectF crop;
+    const QRectF target = screenTargetRect(canvas, &crop);
     const QRectF source(crop.x() * m_screenImage.width(), crop.y() * m_screenImage.height(),
                         crop.width() * m_screenImage.width(), crop.height() * m_screenImage.height());
-    // 2) Fit it into the canvas. Screens and regions already have the canvas's aspect ratio, so
-    //    this fills it; a window resized mid-recording gets black bars instead of being stretched.
-    const core::RectD fit = core::aspectFitRect(core::SizeD{source.width(), source.height()},
-                                                core::SizeD{canvas.width(), canvas.height()});
-    painter.drawImage(QRectF(canvas.x() + fit.x, canvas.y() + fit.y, fit.width, fit.height), m_screenImage, source);
+    painter.drawImage(target, m_screenImage, source);
+}
+
+void FrameCompositor::drawPointer(QPainter &painter, const QRectF &canvas) const {
+    if (!m_pointer.visible || m_screenImage.isNull()) {
+        return;
+    }
+    // Same mapping as the screen picture: frame position -> crop -> fitted canvas rectangle.
+    QRectF crop;
+    const QRectF target = screenTargetRect(canvas, &crop);
+    if (crop.width() <= 0.0 || crop.height() <= 0.0) {
+        return;
+    }
+    const QPointF tip(target.x() + (m_pointer.tip.x() - crop.x()) / crop.width() * target.width(),
+                      target.y() + (m_pointer.tip.y() - crop.y()) / crop.height() * target.height());
+    if (!target.contains(tip)) {
+        return;  // the mouse is outside the recorded region
+    }
+    const double height = m_pointer.height / crop.height() * target.height();
+
+    painter.save();
+    painter.setClipRect(target);  // nothing spills outside the recorded picture
+    if (m_pointer.highlight) {
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(255, 214, 10, 95));  // translucent yellow
+        painter.drawEllipse(tip, height * 1.1, height * 1.1);
+    }
+    // The classic arrow, in units of its height: tip at (0, 0), pointing up-left.
+    static const QPointF kArrow[] = {{0.00, 0.00}, {0.00, 0.80}, {0.20, 0.64}, {0.34, 0.96},
+                                     {0.46, 0.91}, {0.32, 0.60}, {0.57, 0.60}};
+    QPolygonF arrow;
+    for (const QPointF &point : kArrow) {
+        arrow << tip + point * height;
+    }
+    painter.setPen(QPen(Qt::black, std::max(1.0, height * 0.06), Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.setBrush(Qt::white);
+    painter.drawPolygon(arrow);
+    painter.restore();
 }
 
 void FrameCompositor::drawCamera(QPainter &painter, const QRectF &target, bool mirrored) const {

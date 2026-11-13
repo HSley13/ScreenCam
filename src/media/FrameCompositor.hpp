@@ -19,6 +19,15 @@ enum class CompositeLayout {
     CameraOnly,        // camera fills the frame (16:9 or 9:16)
 };
 
+/// The mouse pointer to draw over the screen picture (see core/Pointer.hpp for why it's drawn
+/// at all). Positions are relative to the *captured* frame, before any region crop.
+struct PointerOverlay {
+    bool visible = false;
+    QPointF tip;            // tip of the arrow, 0..1 of the captured frame
+    double height = 0.0;    // arrow height, as a fraction of the captured frame's height
+    bool highlight = false; // yellow halo around it, so viewers find it at a glance
+};
+
 struct CompositorConfig {
     QSize canvasSize;  // output video size in pixels
     // Part of the screen frame to record, normalized (0..1). The whole frame by default; a
@@ -48,6 +57,7 @@ public:
     void configure(const CompositorConfig &config);
     const CompositorConfig &config() const { return m_config; }
     void setBubble(const BubbleStyleSnapshot &bubble);
+    void setPointer(const PointerOverlay &pointer) { m_pointer = pointer; }
 
     // Inputs. Frames are only converted to images when a tick needs them.
     void setScreenFrame(const QVideoFrame &frame);
@@ -78,6 +88,10 @@ private:
     void refreshImages();
     void drawCamera(QPainter &painter, const QRectF &target, bool mirrored) const;
     void drawScreen(QPainter &painter, const QRectF &canvas) const;
+    void drawPointer(QPainter &painter, const QRectF &canvas) const;
+    /// Where the recorded part of the screen picture lands on the canvas, and which part that
+    /// is (normalized crop). Shared by drawScreen() and drawPointer().
+    QRectF screenTargetRect(const QRectF &canvas, QRectF *crop) const;
     void drawBubble(QPainter &painter);
     const QImage &shadowFor(const QSize &bubbleSize, double radius);
     const QImage &maskFor(const QSize &bubbleSize, double radius);
@@ -91,6 +105,7 @@ private:
     bool m_cameraDirty = false;
     QImage m_screenImage;
     QImage m_cameraImage;
+    PointerOverlay m_pointer;
 
     QTimer *m_timer = nullptr;
     bool m_running = false;
