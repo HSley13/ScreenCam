@@ -1,13 +1,10 @@
 import QtQuick
 import QtQuick.Controls
 
-// The recording pill: blinking dot, timer, what is being recorded, pause/resume and stop.
-// Shown under the floating camera bubble. Never recorded: the windows that hold it are
-// excluded from capture.
+// The recording pill under the floating bubble: timer, target, pause and stop.
 Rectangle {
     id: pill
 
-    // Longest the "what is recorded" line may get before it is shortened with "…".
     property real targetMaxWidth: 220
 
     implicitWidth: row.implicitWidth + 24
@@ -64,7 +61,6 @@ Rectangle {
             }
         }
 
-        // Timer on top, what is recorded underneath.
         Column {
             anchors.verticalCenter: parent.verticalCenter
             spacing: 1
@@ -97,7 +93,7 @@ Rectangle {
             }
         }
 
-        // Pause / resume, or cancel during the countdown.
+        // Cancels during the countdown.
         PillButton {
             visible: Recorder.state !== Recorder.Finalizing
             tip: Recorder.state === Recorder.Countdown ? qsTr("Cancel")
@@ -128,7 +124,6 @@ Rectangle {
             }
         }
 
-        // Stop: saves the recording and brings ScreenCam back (editor for projects).
         PillButton {
             visible: Recorder.state === Recorder.Recording || Recorder.state === Recorder.Paused
             tint: Theme.record

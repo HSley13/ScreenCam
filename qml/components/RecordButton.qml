@@ -15,8 +15,7 @@ Item {
     opacity: enabled ? 1.0 : 0.5
     Behavior on scale { NumberAnimation { duration: Theme.animationFast } }
 
-    // Pulsing halo while recording.
-    Rectangle {
+    Rectangle {  // pulsing halo
         id: halo
         anchors.centerIn: parent
         width: parent.width

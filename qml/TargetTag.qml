@@ -2,15 +2,8 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Window
 
-// A small name tag on the screen, window or region being recorded — "Safari — GitHub",
-// "Entire screen · Built-in Retina Display" — so with several monitors and many windows you
-// always know what's in the video.
-//  - While recording: shown the whole time, above the recorded window/region (or inside its
-//    top edge when there's no room), at the top centre of a recorded screen.
-//  - Before recording: appears for a moment whenever you choose another screen, window or
-//    region, or press "Show".
-// Clicks go straight through it, and it's excluded from the recording. A recorded window can
-// move: its place is re-read a few times per second.
+// A name tag on what is being recorded ("Safari — GitHub"): the whole time while recording,
+// and for a moment when the choice changes or "Show" is pressed. Clicks go through it.
 Window {
     id: tag
 
@@ -22,8 +15,7 @@ Window {
     readonly property bool recording: Recorder.busy && Recorder.state !== Recorder.Finalizing
     // Above the window/region, unless that would leave the top of the screen.
     readonly property bool inside: wholeScreen || target.y - height - gap < Screen.virtualY + 4
-    // Linux can't keep windows out of a screen recording: a tag drawn on the recorded screen
-    // would end up in the video, so there it's only shown before recording.
+    // Linux can't keep it out of a screen recording: only shown before recording there.
     readonly property bool wouldBeRecorded: wholeScreen && !WindowTools.canExcludeFromCapture
 
     title: qsTr("ScreenCam Target")
@@ -33,7 +25,7 @@ Window {
            | (Qt.platform.os === "osx" ? 0 : Qt.Tool)
     visible: hasTarget && ((recording && !wouldBeRecorded) || (identifying && !Recorder.busy))
 
-    // Sized from the text itself (a label's own size follows the window it fills).
+    // From the text: the label's own size follows the window.
     width: Math.ceil(Math.min(metrics.advanceWidth + 28, Math.max(160, target.width)))
     height: 26
     x: wholeScreen ? target.x + (target.width - width) / 2 : target.x + (inside ? gap : 0)
@@ -53,7 +45,6 @@ Window {
         }
     }
 
-    // Show what the current choice is, for a couple of seconds.
     function identify() {
         refresh();
         identifying = true;
@@ -74,7 +65,6 @@ Window {
         onTriggered: tag.refresh()
     }
 
-    // Choosing another screen / target / region shows the tag on it.
     Connections {
         target: RecordingSettings
         function onScreenIdChanged() {
@@ -88,8 +78,7 @@ Window {
         }
     }
 
-    // ... and so does picking another window (the list also refreshes on its own, which
-    // doesn't count: only a different selection does).
+    // Only a different window counts, not the list refreshing.
     property int shownWindow: -1
     Connections {
         target: Capture

@@ -1,27 +1,19 @@
 import QtQuick
 
-// A camera bubble placed on a canvas (the editor's preview): geometry + drag/resize.
-//  - Geometry comes from `bubbleStyle.rectFor()` — a BubbleStyle object, the same C++ geometry
-//    the exporter uses — so what you see here is what lands in the video.
-//  - Drag it anywhere; on release it snaps to edges/centre (BubbleStyle.snap).
-//  - Drag the round handle (bottom-right, shown on hover) to resize.
+// The camera bubble on the editor's canvas: drag to move (snaps on release), drag the corner
+// handle to resize. Geometry is BubbleStyle's, the same C++ the export uses.
 Item {
     id: bubble
 
-    // Size of the preview canvas this bubble lives on (in item pixels).
     property size canvasSize: Qt.size(1, 1)
-    // Any object with BubbleStyle's API (the editor passes the current segment's style).
-    property var bubbleStyle: BubbleStyle
+    property var bubbleStyle: BubbleStyle  // or the editor's current segment
     property bool live: true
-    // Glide on shape/position changes. The editor turns it off: there a segment change is a
-    // hard cut in the exported video, so the preview cuts too.
+    // Off in the editor: a segment change is a hard cut in the video, so the preview cuts too.
     property bool animated: true
     property string placeholderText: ""
     readonly property alias video: look.video
 
-    // QML can't see inside C++ function calls, so a binding like rectFor(...) alone would never
-    // update when the style changes. Reading bubbleStyle.revision (bumped on every change, and
-    // always >= 0) makes it part of each binding's dependencies.
+    // QML can't see inside rectFor(): reading `revision` makes the binding update.
     readonly property rect area: bubbleStyle.revision >= 0
                                  ? bubbleStyle.rectFor(canvasSize.width, canvasSize.height)
                                  : Qt.rect(0, 0, 0, 0)
@@ -36,7 +28,6 @@ Item {
     width: area.width
     height: area.height
 
-    // Shape and size changes glide; while dragging the bubble follows the pointer exactly.
     Behavior on x { enabled: bubble.animated && !bubble.dragging; NumberAnimation { duration: Theme.animationNormal; easing.type: Easing.OutCubic } }
     Behavior on y { enabled: bubble.animated && !bubble.dragging; NumberAnimation { duration: Theme.animationNormal; easing.type: Easing.OutCubic } }
     Behavior on width { enabled: bubble.animated && !bubble.dragging; NumberAnimation { duration: Theme.animationNormal; easing.type: Easing.OutCubic } }
@@ -54,8 +45,7 @@ Item {
         placeholderText: bubble.placeholderText
     }
 
-    // Hover highlight so it's obvious the bubble can be grabbed.
-    Rectangle {
+    Rectangle {  // hover ring
         anchors.fill: parent
         anchors.margins: -3
         radius: bubble.cornerRadius + 3
@@ -71,7 +61,6 @@ Item {
         cursorShape: moveDrag.active ? Qt.ClosedHandCursor : Qt.OpenHandCursor
     }
 
-    // Move: remember where the centre was, add the pointer translation (normalized).
     DragHandler {
         id: moveDrag
 
@@ -96,8 +85,7 @@ Item {
         }
     }
 
-    // Resize handle, placed where the shape's edge crosses the bottom-right diagonal
-    // (for a circle that's radius * (1 - 1/sqrt(2)) in from the bounding-box corner).
+    // Resize handle, where the shape's edge crosses the bottom-right diagonal.
     Rectangle {
         id: handle
 
@@ -118,7 +106,7 @@ Item {
             cursorShape: Qt.SizeFDiagCursor
         }
 
-        // The centre stays put, so moving the corner by d pixels grows the bubble by 2d.
+        // The centre stays put: moving the corner by d grows the bubble by 2d.
         DragHandler {
             id: resizeDrag
 

@@ -2,8 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Window
 
-// Full-screen overlay on one display: drag out the rectangle to record.
-// Esc cancels; Enter (or the button) saves it to RecordingSettings.region.
+// Drag out the region to record. Esc cancels; Enter saves it.
 Window {
     id: selector
 
@@ -11,7 +10,7 @@ Window {
     property rect screenGeometry: Qt.rect(0, 0, 800, 600)
     property real pixelRatio: 1.0
 
-    // Selection in this window's coordinates (= the screen's logical coordinates).
+    // = the screen's logical coordinates
     property real startX: 0
     property real startY: 0
     property rect selection: Qt.rect(0, 0, 0, 0)
@@ -34,7 +33,6 @@ Window {
         close();
     }
 
-    // Start from the previous region, if it was on this screen.
     Component.onCompleted: {
         if (RecordingSettings.screenId === screenId && RecordingSettings.region.width > 0) {
             selection = RecordingSettings.region;
@@ -52,7 +50,7 @@ Window {
         onActivated: selector.confirm()
     }
 
-    // Dim everything except the selection: four rectangles around it.
+    // Dim everything but the selection.
     Rectangle { x: 0; y: 0; width: parent.width; height: selector.selection.y; color: "#99000000" }
     Rectangle {
         x: 0; y: selector.selection.y + selector.selection.height
@@ -77,8 +75,7 @@ Window {
         border.width: 2
         visible: selector.selection.width > 0
 
-        // Size in real pixels (what the video will be before scaling).
-        Rectangle {
+        Rectangle {  // size in real pixels
             anchors.top: parent.bottom
             anchors.topMargin: 8
             anchors.left: parent.left
@@ -114,7 +111,6 @@ Window {
         }
     }
 
-    // Instructions + buttons, centred near the top.
     Rectangle {
         anchors.horizontalCenter: parent.horizontalCenter
         y: 40

@@ -22,7 +22,6 @@ Rectangle {
         font.pixelSize: 168
         font.weight: Font.Bold
 
-        // Each new number pops in.
         onTextChanged: pop.restart()
 
         ParallelAnimation {

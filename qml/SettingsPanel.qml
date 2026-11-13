@@ -3,14 +3,12 @@ import QtQuick.Controls
 import QtQuick.Dialogs
 import QtQuick.Layouts
 
-// The right-hand sidebar. Every control reads from and writes to RecordingSettings, which
-// persists the choice; the capture code reacts to those settings, not to this UI.
+// The sidebar: every control edits RecordingSettings; the capture code follows the settings.
 Rectangle {
     id: panel
 
-    property bool locked: false  // true while recording: settings can't change mid-take
+    property bool locked: false  // while recording
     default property alias extraSections: extras.data
-
 
     color: Theme.surface
     radius: Theme.radius
@@ -68,7 +66,6 @@ Rectangle {
                             onPicked: (value) => RecordingSettings.screenId = value
                         }
 
-                        // Names the chosen screen on it for a moment: which monitor is it?
                         StyledButton {
                             text: qsTr("Show")
                             onClicked: Capture.identifyTarget()
@@ -91,7 +88,7 @@ Rectangle {
                             selectedValue: Capture.selectedWindow
                             displayText: Capture.selectedWindow < 0 ? qsTr("Choose a window…") : currentText
                             onPicked: (value) => Capture.selectedWindow = value
-                            // Apps open and close all the time: re-read the list each time it opens.
+
                             onAboutToOpen: Capture.refreshWindows()
                         }
 
@@ -181,13 +178,12 @@ Rectangle {
                     AudioLevelMeter {
                         id: meter
                         deviceId: RecordingSettings.microphoneId
-                        // Only listen while the window is in front: no hidden mic use in the background.
+                        // No hidden mic use in the background.
                         active: Devices.microphoneAllowed && panel.Window.active
                     }
                 }
             }
 
-            // Sections added by other features (camera bubble, ...) are inserted here.
             ColumnLayout {
                 id: extras
                 Layout.fillWidth: true
@@ -242,8 +238,6 @@ Rectangle {
                     }
                 }
 
-                // The pointer is drawn by ScreenCam (most capture methods leave it out), so it
-                // shows up even when an app hides it — e.g. during a PowerPoint slide show.
                 StyledSwitch {
                     Layout.fillWidth: true
                     text: qsTr("Show mouse pointer")
@@ -298,7 +292,6 @@ Rectangle {
         }
     }
 
-    // Opens the region selector on the chosen screen.
     function selectRegion() {
         const screens = Devices.screens;
         let entry = screens.length > 0 ? screens[0] : null;

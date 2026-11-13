@@ -2,8 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// Red banner: the last recording error (dismissible), or a setup problem that blocks
-// recording altogether (e.g. Qt without its FFmpeg backend), which stays until fixed.
+// The last recording error (dismissible), or a setup problem that blocks recording.
 Rectangle {
     id: banner
 
