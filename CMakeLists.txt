@@ -155,6 +155,7 @@ if(SCREENCAM_BUILD_APP)
         src/app/ExcludingScreenCapture.hpp
         src/app/ProjectEditor.cpp src/app/ProjectEditor.hpp
         src/app/RecordingController.cpp src/app/RecordingController.hpp
+        src/app/RecordingLibrary.cpp src/app/RecordingLibrary.hpp
         src/app/RecordingSettings.cpp src/app/RecordingSettings.hpp
         src/app/WindowTools.cpp src/app/WindowTools.hpp
     )
@@ -172,6 +173,7 @@ if(SCREENCAM_BUILD_APP)
         qml/Main.qml
         qml/MiniControlBar.qml
         qml/RecordingControls.qml
+        qml/RecordingsPopup.qml
         qml/PreviewStage.qml
         qml/RegionSelector.qml
         qml/SettingsPanel.qml
