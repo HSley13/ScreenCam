@@ -232,7 +232,7 @@ void ExcludingScreenCapture::Private::startStreamWith(ExcludingScreenCapture *q,
     }
 
     // The whole point: leave out every window of this app — preview, bubble, controls,
-    // outline — including ones opened after the capture started.
+    // name tag — including ones opened after the capture started.
     NSMutableArray<SCRunningApplication *> *excluded = [NSMutableArray array];
     const pid_t ownPid = getpid();
     for (SCRunningApplication *app in content.applications) {

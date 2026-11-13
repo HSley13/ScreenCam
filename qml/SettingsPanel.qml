@@ -86,7 +86,7 @@ Rectangle {
                             onPicked: (value) => RecordingSettings.screenId = value
                         }
 
-                        // Frames the chosen screen for a moment: which monitor is it?
+                        // Names the chosen screen on it for a moment: which monitor is it?
                         StyledButton {
                             text: qsTr("Show")
                             onClicked: Capture.identifyTarget()

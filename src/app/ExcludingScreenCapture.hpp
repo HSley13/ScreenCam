@@ -12,7 +12,7 @@
 /// Why: Qt's QScreenCapture on macOS records the screen through AVCaptureScreenInput, which
 /// records *everything* on it — including ScreenCam's own preview, which then shows itself
 /// inside itself forever (the "infinite mirror"), plus the floating bubble, controls and
-/// outline. The per-window "don't share me" flag (NSWindowSharingNone) is not honoured by it.
+/// name tag. The per-window "don't share me" flag (NSWindowSharingNone) is not honoured by it.
 /// Apple's ScreenCaptureKit can instead be told "this display, minus these apps", and the
 /// exclusion covers every window the app has or opens later.
 ///

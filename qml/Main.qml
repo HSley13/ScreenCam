@@ -107,8 +107,8 @@ ApplicationWindow {
         bubbleShown: floatingBubble.visible
     }
 
-    // Frame + name around the window or region being recorded.
-    RecordingOutline {}
+    // The name of the screen, window or region being recorded, shown on it.
+    TargetTag {}
 
     // Your camera, floating on the desktop (only in Screen + Camera mode), with the
     // recording controls attached while recording.
