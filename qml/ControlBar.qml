@@ -112,7 +112,7 @@ Rectangle {
         StyledButton {
             visible: Recorder.state === Recorder.Idle && Recorder.lastRecording.length > 0
             accent: true
-            text: Recorder.lastRecording.endsWith(".screencam") ? qsTr("Edit recording") : qsTr("Play recording")
+            text: qsTr("Edit recording")
             onClicked: Recorder.openLastRecording()
         }
 

@@ -11,8 +11,6 @@ Rectangle {
     property bool locked: false  // true while recording: settings can't change mid-take
     default property alias extraSections: extras.data
 
-    readonly property bool screenMode: RecordingSettings.mode !== RecordingSettings.CameraOnly
-    readonly property bool cameraMode: RecordingSettings.mode !== RecordingSettings.ScreenOnly
 
     color: Theme.surface
     radius: Theme.radius
@@ -33,26 +31,10 @@ Rectangle {
             opacity: enabled ? 1.0 : 0.6
 
             SidebarSection {
-                title: qsTr("Record")
-
-                SegmentedControl {
-                    Layout.fillWidth: true
-                    options: [
-                        { value: RecordingSettings.ScreenAndCamera, label: qsTr("Screen + Cam") },
-                        { value: RecordingSettings.ScreenOnly, label: qsTr("Screen") },
-                        { value: RecordingSettings.CameraOnly, label: qsTr("Camera") }
-                    ]
-                    value: RecordingSettings.mode
-                    onActivated: (value) => RecordingSettings.mode = value
-                }
-            }
-
-            SidebarSection {
                 title: qsTr("Sources")
 
                 Field {
                     label: qsTr("Record")
-                    visible: panel.screenMode
 
                     SegmentedControl {
                         Layout.fillWidth: true
@@ -73,7 +55,7 @@ Rectangle {
 
                 Field {
                     label: qsTr("Screen")
-                    visible: panel.screenMode && RecordingSettings.captureTarget !== RecordingSettings.Window
+                    visible: RecordingSettings.captureTarget !== RecordingSettings.Window
 
                     RowLayout {
                         Layout.fillWidth: true
@@ -97,7 +79,7 @@ Rectangle {
                 Field {
                     label: qsTr("Window")
                     hint: qsTr("%n app window(s)", "", Capture.windows.length)
-                    visible: panel.screenMode && RecordingSettings.captureTarget === RecordingSettings.Window
+                    visible: RecordingSettings.captureTarget === RecordingSettings.Window
 
                     RowLayout {
                         Layout.fillWidth: true
@@ -141,7 +123,7 @@ Rectangle {
                     label: qsTr("Area")
                     hint: RecordingSettings.region.width > 0
                           ? Capture.screenSize.width + " × " + Capture.screenSize.height + " px" : qsTr("none yet")
-                    visible: panel.screenMode && RecordingSettings.captureTarget === RecordingSettings.Region
+                    visible: RecordingSettings.captureTarget === RecordingSettings.Region
 
                     StyledButton {
                         Layout.fillWidth: true
@@ -153,7 +135,6 @@ Rectangle {
 
                 Field {
                     label: qsTr("Camera")
-                    visible: panel.cameraMode
 
                     StyledComboBox {
                         Layout.fillWidth: true
@@ -219,7 +200,6 @@ Rectangle {
                 Field {
                     label: qsTr("Resolution")
                     hint: qsTr("keeps your screen's shape")
-                    visible: panel.screenMode
 
                     StyledComboBox {
                         Layout.fillWidth: true
@@ -266,7 +246,6 @@ Rectangle {
                 // shows up even when an app hides it — e.g. during a PowerPoint slide show.
                 StyledSwitch {
                     Layout.fillWidth: true
-                    visible: panel.screenMode
                     text: qsTr("Show mouse pointer")
                     checked: RecordingSettings.showPointer
                     onToggled: RecordingSettings.showPointer = checked
@@ -274,7 +253,7 @@ Rectangle {
 
                 StyledSwitch {
                     Layout.fillWidth: true
-                    visible: panel.screenMode && RecordingSettings.showPointer
+                    visible: RecordingSettings.showPointer
                     text: qsTr("Highlight pointer")
                     checked: RecordingSettings.highlightPointer
                     onToggled: RecordingSettings.highlightPointer = checked

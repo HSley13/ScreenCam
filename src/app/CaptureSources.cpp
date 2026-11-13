@@ -3,7 +3,6 @@
 #include "app/AppWindows.hpp"
 #include "app/DeviceCatalog.hpp"
 #include "app/RecordingSettings.hpp"
-#include "core/CameraLayout.hpp"
 #include "core/Pointer.hpp"
 #include "core/Resolution.hpp"
 #include "media/MediaBackendCheck.hpp"
@@ -172,11 +171,6 @@ CaptureSources::CaptureSources(QObject *parent)
 
     // React to the user's choices.
     RecordingSettings *settings = RecordingSettings::instance();
-    connect(settings, &RecordingSettings::modeChanged, this, [this] {
-        updateScreen();
-        updateCamera();
-        emit outputSizeChanged();
-    });
     connect(settings, &RecordingSettings::screenIdChanged, this, [this] {
         updateScreen();
         emit outputSizeChanged();
@@ -199,7 +193,6 @@ CaptureSources::CaptureSources(QObject *parent)
     connect(settings, &RecordingSettings::frameRateChanged, this, [this] {
         m_excludingCapture.setFramesPerSecond(RecordingSettings::instance()->frameRate());
     });
-    connect(settings, &RecordingSettings::cameraOnlyOrientationChanged, this, &CaptureSources::outputSizeChanged);
 
     DeviceCatalog *devices = DeviceCatalog::instance();
     connect(devices, &DeviceCatalog::camerasChanged, this, &CaptureSources::updateCamera);
@@ -277,7 +270,7 @@ void CaptureSources::updateScreen() {
         return;
     }
 
-    const bool live = settings->usesScreen() && wantsInputs();
+    const bool live = wantsInputs();
     const bool windowChosen = m_selectedWindow >= 0 && m_selectedWindow < m_windows.size();
     const bool wantWindow = live && target == RecordingSettings::CaptureTarget::Window && windowChosen;
     const bool wantScreen = live && target != RecordingSettings::CaptureTarget::Window && screen != nullptr;
@@ -385,9 +378,6 @@ void CaptureSources::refreshWindows() {
 
 QString CaptureSources::targetLabel() const {
     const RecordingSettings *settings = RecordingSettings::instance();
-    if (!settings->usesScreen()) {
-        return tr("Camera only");
-    }
     const QScreen *screen = DeviceCatalog::findScreen(settings->screenId());
     const QString screenName = screen != nullptr ? screen->name() : tr("no screen");
     switch (settings->captureTarget()) {
@@ -409,9 +399,6 @@ QString CaptureSources::targetLabel() const {
 
 QRect CaptureSources::targetBounds() const {
     const RecordingSettings *settings = RecordingSettings::instance();
-    if (!settings->usesScreen()) {
-        return {};
-    }
     switch (settings->captureTarget()) {
     case RecordingSettings::CaptureTarget::Window:
         if (m_selectedWindow >= 0 && m_selectedWindow < m_windowIds.size() && m_windowIds.at(m_selectedWindow) != 0) {
@@ -471,7 +458,7 @@ QRect CaptureSources::pointerTargetBounds() const {
 PointerOverlay CaptureSources::pointerOverlay() const {
     PointerOverlay overlay;
     const RecordingSettings *settings = RecordingSettings::instance();
-    if (!settings->showPointer() || !settings->usesScreen()) {
+    if (!settings->showPointer()) {
         return overlay;
     }
     overlay.arrow = !captureIncludesPointer();
@@ -512,7 +499,7 @@ void CaptureSources::releaseCamera() {
 
 void CaptureSources::updateCamera() {
     const RecordingSettings *settings = RecordingSettings::instance();
-    const bool wanted = settings->usesCamera() && (wantsInputs() || m_bubbleVisible) &&
+    const bool wanted = !settings->cameraId().isEmpty() && (wantsInputs() || m_bubbleVisible) &&
                         DeviceCatalog::instance()->cameraAllowed();
     const std::optional<QCameraDevice> device = DeviceCatalog::findCamera(settings->cameraId());
 
@@ -581,14 +568,7 @@ QRectF CaptureSources::sourceCrop() const {
 
 QSize CaptureSources::outputSize() const {
     const RecordingSettings *settings = RecordingSettings::instance();
-    if (settings->mode() == RecordingSettings::CaptureMode::CameraOnly) {
-        // Just you: the largest 16:9 or 9:16 rectangle the camera can fill.
-        const core::PixelSize size = core::cameraRecordingSize(
-            core::PixelSize{m_cameraResolution.width(), m_cameraResolution.height()},
-            static_cast<core::CameraOrientation>(settings->cameraOnlyOrientation()));
-        return {size.width, size.height};
-    }
-    // Screen modes: the screen's pixels scaled to the chosen preset (aspect ratio kept).
+    // The screen's (window's, region's) pixels scaled to the chosen preset, aspect ratio kept.
     const QSize screen = screenSize();
     const core::PixelSize size = core::computeCaptureSize(core::PixelSize{screen.width(), screen.height()},
                                                           static_cast<core::ResolutionPreset>(settings->resolution()));

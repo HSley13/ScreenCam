@@ -7,7 +7,6 @@
 
 #include "core/AudioLevel.hpp"
 #include "core/BubbleGeometry.hpp"
-#include "core/CameraLayout.hpp"
 #include "core/Nv12.hpp"
 #include "core/EncoderPlan.hpp"
 #include "core/Resolution.hpp"
@@ -56,23 +55,6 @@ void testCaptureSize() {
     CHECK((computeCaptureSize(fullHd, ResolutionPreset::UHD2160) == PixelSize{1920, 1080}));
 
     CHECK((computeCaptureSize(PixelSize{0, 0}, ResolutionPreset::Native) == PixelSize{0, 0}));
-}
-
-void testCameraRecordingSize() {
-    const PixelSize webcam{1920, 1080};
-    CHECK((cameraRecordingSize(webcam, CameraOrientation::Landscape) == PixelSize{1920, 1080}));
-    // 1080 * 9 / 16 = 607.5 -> 608
-    CHECK((cameraRecordingSize(webcam, CameraOrientation::Portrait) == PixelSize{608, 1080}));
-
-    const PixelSize fourByThree{1280, 960};
-    CHECK((cameraRecordingSize(fourByThree, CameraOrientation::Landscape) == PixelSize{1280, 720}));
-    CHECK((cameraRecordingSize(fourByThree, CameraOrientation::Portrait) == PixelSize{540, 960}));
-
-    // A portrait camera (iPhone Continuity Camera held upright) asked for landscape.
-    const PixelSize upright{1080, 1920};
-    CHECK((cameraRecordingSize(upright, CameraOrientation::Landscape) == PixelSize{1080, 608}));
-
-    CHECK((cameraRecordingSize(PixelSize{}, CameraOrientation::Portrait) == PixelSize{0, 0}));
 }
 
 void testEncoderPlan() {
@@ -307,7 +289,6 @@ void testPointerPlacement() {
 int main() {
     testMakeEven();
     testCaptureSize();
-    testCameraRecordingSize();
     testEncoderPlan();
     testFormatElapsed();
     testBubbleSize();

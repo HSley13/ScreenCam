@@ -31,8 +31,7 @@ Window {
     flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.NoDropShadowWindowHint
            | Qt.WindowTransparentForInput | Qt.WindowDoesNotAcceptFocus
            | (Qt.platform.os === "osx" ? 0 : Qt.Tool)
-    visible: hasTarget && RecordingSettings.mode !== RecordingSettings.CameraOnly
-             && ((recording && !wouldBeRecorded) || (identifying && !Recorder.busy))
+    visible: hasTarget && ((recording && !wouldBeRecorded) || (identifying && !Recorder.busy))
 
     // Sized from the text itself (a label's own size follows the window it fills).
     width: Math.ceil(Math.min(metrics.advanceWidth + 28, Math.max(160, target.width)))

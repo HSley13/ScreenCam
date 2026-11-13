@@ -36,7 +36,6 @@ endif()
 add_library(screencam_core STATIC
     src/core/AudioLevel.cpp
     src/core/BubbleGeometry.cpp
-    src/core/CameraLayout.cpp
     src/core/EncoderPlan.cpp
     src/core/Nv12.cpp
     src/core/Pointer.cpp
@@ -172,7 +171,6 @@ if(SCREENCAM_BUILD_APP)
         qml/ErrorBanner.qml
         qml/FloatingBubble.qml
         qml/Main.qml
-        qml/MiniControlBar.qml
         qml/RecordingControls.qml
         qml/RecordingsPopup.qml
         qml/PreviewStage.qml

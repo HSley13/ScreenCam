@@ -91,7 +91,7 @@ public:
     /// Where the recorded screen, window or region is on the desktop right now (Qt global
     /// coordinates), for the tag that names it. For a screen: its usable area (without
     /// the menu bar / Dock / taskbar, so the tag isn't hidden under them). Empty for a
-    /// window that is minimized or closed, and in Camera-only mode.
+    /// window that is minimized or closed.
     Q_INVOKABLE QRect targetBounds() const;
     /// Where the mouse pointer goes in the next video frame (see core/Pointer.hpp): only while
     /// the mouse is over what's recorded and "Show mouse pointer" is on. When the capture

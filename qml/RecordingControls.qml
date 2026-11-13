@@ -2,8 +2,8 @@ import QtQuick
 import QtQuick.Controls
 
 // The recording pill: blinking dot, timer, what is being recorded, pause/resume and stop.
-// Shown under the floating camera bubble, or on its own (MiniControlBar) when there is no
-// bubble. Never recorded: the windows that hold it are excluded from capture.
+// Shown under the floating camera bubble. Never recorded: the windows that hold it are
+// excluded from capture.
 Rectangle {
     id: pill
 
