@@ -274,7 +274,11 @@ void RecordingController::onPipelineDone(bool camera, const QString &error) {
     }
 
     completeProject();
-    finish();
+    const bool saved = m_lastRecording == m_project.folder && !m_project.folder.isEmpty();
+    finish();  // brings the recorder window back...
+    if (saved) {
+        emit openProjectRequested(m_project.folder);  // ...then the editor opens on top of it
+    }
 }
 
 void RecordingController::completeProject() {
@@ -295,7 +299,6 @@ void RecordingController::completeProject() {
     }
     m_lastRecording = m_project.folder;
     emit lastRecordingChanged();
-    emit openProjectRequested(m_project.folder);
 }
 
 void RecordingController::stop() {
