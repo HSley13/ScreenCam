@@ -121,6 +121,7 @@ CaptureSources::CaptureSources(QObject *parent)
     connect(&m_windowSink, &QVideoSink::videoFrameChanged, this, &CaptureSources::onTargetFrame);
     connect(&m_cameraSink, &QVideoSink::videoFrameChanged, this, [this](const QVideoFrame &frame) {
         forward(m_cameraPreviews, frame);
+        m_lastCameraFrame = frame;
         if (frame.size() != m_cameraResolution && frame.isValid()) {
             m_cameraResolution = frame.size();  // trust real frames over the requested format
             emit cameraResolutionChanged();
@@ -245,6 +246,7 @@ void CaptureSources::onTargetFrame(const QVideoFrame &frame) {
         emit outputSizeChanged();
     }
     forward(m_screenPreviews, frame);
+    m_lastScreenFrame = frame;
     emit screenFrameArrived(frame);
 }
 
@@ -255,10 +257,12 @@ void CaptureSources::updateScreen() {
     if (m_useExcludingCapture) {
         if (m_excludingCapture.screen() != screen) {
             m_excludingCapture.setScreen(screen);
+            m_lastScreenFrame = QVideoFrame();  // belonged to the previous screen
             emit outputSizeChanged();
         }
     } else if (m_screenCapture.screen() != screen) {
         m_screenCapture.setScreen(screen);
+        m_lastScreenFrame = QVideoFrame();
         emit outputSizeChanged();
     }
     if (!m_backendProblem.isEmpty()) {
@@ -296,6 +300,7 @@ void CaptureSources::updateScreen() {
         if (m_windowCapture.window() != window) {
             m_windowCapture.setWindow(window);
             m_windowFrameSize = QSize();
+            m_lastScreenFrame = QVideoFrame();
             emit outputSizeChanged();
         }
     }
@@ -501,6 +506,32 @@ void CaptureSources::updateCamera() {
     const RecordingSettings *settings = RecordingSettings::instance();
     const bool wanted = !settings->cameraId().isEmpty() && (wantsInputs() || m_bubbleVisible) &&
                         DeviceCatalog::instance()->cameraAllowed();
+
+    // The stand-in camera: the same picture 30 times a second, through the same sink as a
+    // real camera's frames (so previews, resolution and recording all work unchanged).
+    const bool demo = settings->cameraId() == QLatin1String(DeviceCatalog::kDemoCameraId);
+    if (wanted && demo && !m_demoCamera.isActive()) {
+        releaseCamera();
+        const QImage image(DeviceCatalog::demoCameraImage());
+        if (image.isNull()) {
+            setCameraError(tr("The demo camera picture can't be read."));
+            return;
+        }
+        setCameraError(QString());
+        const QVideoFrame frame(image.convertToFormat(QImage::Format_RGB32));
+        disconnect(&m_demoCamera, nullptr, this, nullptr);
+        connect(&m_demoCamera, &QTimer::timeout, this, [this, frame] { m_cameraSink.setVideoFrame(frame); });
+        m_demoCamera.start(33);
+        emit cameraActiveChanged();
+        return;
+    }
+    if (!(wanted && demo) && m_demoCamera.isActive()) {
+        m_demoCamera.stop();
+        emit cameraActiveChanged();
+    }
+    if (demo) {
+        return;
+    }
     const std::optional<QCameraDevice> device = DeviceCatalog::findCamera(settings->cameraId());
 
     if (!wanted || !device) {
