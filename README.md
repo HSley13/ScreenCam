@@ -269,7 +269,7 @@ out of every screen capture, and the camera is recorded on its own track.
 - **Windows:** each ScreenCam window sets `WDA_EXCLUDEFROMCAPTURE` (`WindowTools`).
 - **Linux:** no way to hide windows from a capture; record a window or a region instead.
 
-Its position when you stopped becomes the first part's position in the editor;
+The bubble's position when you stopped becomes the first part's position in the editor;
 the final picture is composited at export time. That gives you:
 
 - no "screen inside the screen" loop in the preview,
