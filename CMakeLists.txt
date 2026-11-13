@@ -168,6 +168,7 @@ if(SCREENCAM_BUILD_APP)
         qml/EditorInspector.qml
         qml/EditorPage.qml
         qml/EditorTimeline.qml
+        qml/EditorWindow.qml
         qml/ErrorBanner.qml
         qml/FloatingBubble.qml
         qml/Main.qml
