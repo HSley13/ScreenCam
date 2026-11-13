@@ -149,6 +149,7 @@ if(SCREENCAM_BUILD_APP)
         src/app/BubbleStyle.cpp src/app/BubbleStyle.hpp
         src/app/CaptureSources.cpp src/app/CaptureSources.hpp
         src/app/DeviceCatalog.cpp src/app/DeviceCatalog.hpp
+        src/app/ExcludingScreenCapture.hpp
         src/app/ProjectEditor.cpp src/app/ProjectEditor.hpp
         src/app/RecordingController.cpp src/app/RecordingController.hpp
         src/app/RecordingSettings.cpp src/app/RecordingSettings.hpp
@@ -200,10 +201,16 @@ if(SCREENCAM_BUILD_APP)
     set(SCREENCAM_PLATFORM_LIBS)
     if(APPLE)
         enable_language(OBJCXX)  # these .mm files talk to AppKit (NSWindow, NSRunningApplication)
-        list(APPEND SCREENCAM_PLATFORM_FILES src/app/WindowTools_mac.mm src/app/AppWindows_mac.mm)
-        list(APPEND SCREENCAM_PLATFORM_LIBS "-framework AppKit" "-framework CoreGraphics")
+        list(APPEND SCREENCAM_PLATFORM_FILES
+            src/app/WindowTools_mac.mm src/app/AppWindows_mac.mm src/app/ExcludingScreenCapture_mac.mm)
+        # ScreenCaptureKit (macOS 12.3+) is weak-linked: the app still starts on 12.0-12.2 and
+        # falls back to Qt's screen capture there.
+        list(APPEND SCREENCAM_PLATFORM_LIBS "-framework AppKit" "-framework CoreGraphics" "-framework CoreMedia"
+                                            "-framework CoreVideo" "-weak_framework ScreenCaptureKit")
+        # Automatic reference counting for the ScreenCaptureKit code (streams, outputs, blocks).
+        set_source_files_properties(src/app/ExcludingScreenCapture_mac.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
     elseif(WIN32)
-        list(APPEND SCREENCAM_PLATFORM_FILES src/app/AppWindows_win.cpp)
+        list(APPEND SCREENCAM_PLATFORM_FILES src/app/AppWindows_win.cpp src/app/ExcludingScreenCapture_other.cpp)
         list(APPEND SCREENCAM_PLATFORM_LIBS dwmapi version)  # cloaked windows; app names
     else()
         find_package(X11)
@@ -213,6 +220,7 @@ if(SCREENCAM_BUILD_APP)
         else()
             list(APPEND SCREENCAM_PLATFORM_FILES src/app/AppWindows_other.cpp)
         endif()
+        list(APPEND SCREENCAM_PLATFORM_FILES src/app/ExcludingScreenCapture_other.cpp)
     endif()
 
     qt_add_executable(ScreenCam WIN32 MACOSX_BUNDLE src/app/main.cpp ${SCREENCAM_PLATFORM_FILES})
