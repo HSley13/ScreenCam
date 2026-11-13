@@ -262,6 +262,24 @@ Rectangle {
                     }
                 }
 
+                // The pointer is drawn by ScreenCam (most capture methods leave it out), so it
+                // shows up even when an app hides it — e.g. during a PowerPoint slide show.
+                StyledSwitch {
+                    Layout.fillWidth: true
+                    visible: panel.screenMode
+                    text: qsTr("Show mouse pointer")
+                    checked: RecordingSettings.showPointer
+                    onToggled: RecordingSettings.showPointer = checked
+                }
+
+                StyledSwitch {
+                    Layout.fillWidth: true
+                    visible: panel.screenMode && RecordingSettings.showPointer
+                    text: qsTr("Highlight pointer")
+                    checked: RecordingSettings.highlightPointer
+                    onToggled: RecordingSettings.highlightPointer = checked
+                }
+
                 StyledSwitch {
                     Layout.fillWidth: true
                     text: qsTr("Hide ScreenCam while recording")
