@@ -9,9 +9,22 @@ Window {
     id: win
 
     readonly property int padding: 28  // room around the bubble for its shadow
-    // Same size rules as in the video, relative to this screen.
-    readonly property rect area: BubbleStyle.revision >= 0 ? BubbleStyle.rectFor(Screen.width, Screen.height)
-                                                           : Qt.rect(0, 0, 0, 0)
+    // The bubble is sized like it will be in the video: relative to the *recorded* screen.
+    // Not relative to the screen the bubble happens to be on — then dragging it onto another
+    // monitor resized it mid-drag, and the window manager threw it back where it came from.
+    readonly property rect referenceGeometry: {
+        const screens = Devices.screens;
+        for (let i = 0; i < screens.length; i++) {
+            if (screens[i].id === RecordingSettings.screenId && screens[i].geometry !== undefined) {
+                return screens[i].geometry;
+            }
+        }
+        return Qt.rect(Screen.virtualX, Screen.virtualY, Screen.width, Screen.height);
+    }
+    readonly property size referenceSize: Qt.size(referenceGeometry.width, referenceGeometry.height)
+    readonly property rect area: BubbleStyle.revision >= 0
+                                 ? BubbleStyle.rectFor(referenceSize.width, referenceSize.height)
+                                 : Qt.rect(0, 0, 0, 0)
     readonly property bool showControls: Recorder.busy
     // The controls straddle the bubble's bottom edge: half over it, half below.
     readonly property real controlsOverhang: showControls ? controls.implicitHeight / 2 : 0
@@ -22,20 +35,36 @@ Window {
     height: area.height + controlsOverhang + 2 * padding
 
     // When the controls make the window wider, grow it equally to both sides so the bubble
-    // itself doesn't jump.
+    // itself doesn't jump. Never while it's being dragged: moving a window from code during a
+    // drag fights the window manager.
     property real previousWidth: width
+    property bool moving: false
     onWidthChanged: {
-        x = x - (width - previousWidth) / 2;
+        if (!moving) {
+            x = x - (width - previousWidth) / 2;
+        }
         previousWidth = width;
     }
     color: "transparent"
     flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.NoDropShadowWindowHint
            | (Qt.platform.os === "osx" ? 0 : Qt.Tool)  // Tool windows hide with the app on macOS
 
-    // Start in the bottom-left corner of the screen.
-    Component.onCompleted: {
-        x = Screen.virtualX + 40;
-        y = Screen.virtualY + Screen.desktopAvailableHeight - height - 40;
+    // Start in the bottom-left corner of the recorded screen.
+    function placeOnRecordedScreen() {
+        x = referenceGeometry.x + 40;
+        y = referenceGeometry.y + referenceGeometry.height - height - 90;  // above a bottom Dock/taskbar
+    }
+    Component.onCompleted: placeOnRecordedScreen()
+
+    // Picking another screen to record (before recording) brings the bubble along to it.
+    // During a recording it stays wherever you put it.
+    Connections {
+        target: RecordingSettings
+        function onScreenIdChanged() {
+            if (!Recorder.busy) {
+                win.placeOnRecordedScreen();
+            }
+        }
     }
     onVisibleChanged: {
         if (visible) {
@@ -44,8 +73,22 @@ Window {
         Capture.bubbleVisible = visible;
     }
     // Report where it sits, so the editor can start with the same placement.
-    onXChanged: reportTimer.restart()
-    onYChanged: reportTimer.restart()
+    onXChanged: {
+        reportTimer.restart();
+        settleTimer.restart();
+    }
+    onYChanged: {
+        reportTimer.restart();
+        settleTimer.restart();
+    }
+
+    // A drag handed to the window manager has no "finished" signal: call it finished once the
+    // window has stopped moving for a moment.
+    Timer {
+        id: settleTimer
+        interval: 400
+        onTriggered: win.moving = false
+    }
 
     Timer {
         id: reportTimer
@@ -61,7 +104,7 @@ Window {
         width: win.area.width
         height: win.area.height
         cornerRadius: BubbleStyle.revision >= 0 ? BubbleStyle.radiusFor(width, height) : 0
-        borderWidth: BubbleStyle.revision >= 0 ? BubbleStyle.borderFor(Screen.width, Screen.height) : 0
+        borderWidth: BubbleStyle.revision >= 0 ? BubbleStyle.borderFor(win.referenceSize.width, win.referenceSize.height) : 0
         borderColor: BubbleStyle.borderColor
         shadowEnabled: BubbleStyle.shadow
         mirrored: BubbleStyle.mirrored
@@ -89,17 +132,37 @@ Window {
         cursorShape: Qt.OpenHandCursor
     }
 
-    // The window manager moves the window (smooth, works across screens).
+    // The window manager moves the window (smooth, and free to cross onto other monitors).
+    // If the platform can't do that, move it ourselves: window position + how far the
+    // pointer has travelled on the desktop since the press.
     DragHandler {
+        id: drag
+
+        property bool manual: false
+        property point pressWindow
+        property point pressPointer
+
         target: null
         onActiveChanged: {
             if (active) {
-                win.startSystemMove();
+                win.moving = true;
+                manual = !win.startSystemMove();
+                pressWindow = Qt.point(win.x, win.y);
+                pressPointer = Qt.point(win.x + centroid.scenePosition.x, win.y + centroid.scenePosition.y);
+            } else {
+                manual = false;
+            }
+        }
+        onCentroidChanged: {
+            if (active && manual) {
+                // scenePosition is relative to the window, which moves: add its position back.
+                win.x = pressWindow.x + (win.x + centroid.scenePosition.x - pressPointer.x);
+                win.y = pressWindow.y + (win.y + centroid.scenePosition.y - pressPointer.y);
             }
         }
     }
 
-    // Scroll to resize (one wheel notch = 1% of the screen's short side).
+    // Scroll to resize (one wheel notch = 1% of the recorded screen's short side).
     MouseArea {
         anchors.fill: view
         acceptedButtons: Qt.NoButton

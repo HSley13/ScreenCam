@@ -12,8 +12,10 @@ built with CMake. Runs on **macOS, Windows and Linux** from the same code.
 - While recording, your camera floats on the desktop as a **bubble window** you can drag
   anywhere, with the **recording controls attached under it**: timer, what is being recorded,
   **pause** and **stop** (Screen-only recordings get the same controls as a small floating bar).
-  A **coloured frame with a name tag** ("● Recording · Safari — GitHub") marks the window or
-  region being recorded and follows the window if you move it. ScreenCam's own
+  A **coloured frame with a name tag** ("● Recording · Safari — GitHub") marks the screen,
+  window or region being recorded and follows the window if you move it. Before recording,
+  the frame flashes on your choice whenever you change it (or press **Show**), so with two
+  monitors you can see which one you picked. The bubble can be dragged to any monitor. ScreenCam's own
   windows are left out of the recording on macOS and Windows, so the preview never shows an
   endless "screen inside the screen".
 - **Edit after recording**: a Screen + Camera recording is saved as a *project*. In the editor,

@@ -75,11 +75,22 @@ Rectangle {
                     label: qsTr("Screen")
                     visible: panel.screenMode && RecordingSettings.captureTarget !== RecordingSettings.Window
 
-                    StyledComboBox {
+                    RowLayout {
                         Layout.fillWidth: true
-                        model: Devices.screens
-                        selectedValue: RecordingSettings.screenId
-                        onPicked: (value) => RecordingSettings.screenId = value
+                        spacing: 8
+
+                        StyledComboBox {
+                            Layout.fillWidth: true
+                            model: Devices.screens
+                            selectedValue: RecordingSettings.screenId
+                            onPicked: (value) => RecordingSettings.screenId = value
+                        }
+
+                        // Frames the chosen screen for a moment: which monitor is it?
+                        StyledButton {
+                            text: qsTr("Show")
+                            onClicked: Capture.identifyTarget()
+                        }
                     }
                 }
 
@@ -100,6 +111,12 @@ Rectangle {
                             onPicked: (value) => Capture.selectedWindow = value
                             // Apps open and close all the time: re-read the list each time it opens.
                             onAboutToOpen: Capture.refreshWindows()
+                        }
+
+                        StyledButton {
+                            text: qsTr("Show")
+                            enabled: Capture.selectedWindow >= 0
+                            onClicked: Capture.identifyTarget()
                         }
 
                         StyledButton {
