@@ -169,10 +169,10 @@ if(SCREENCAM_BUILD_APP)
         qml/Main.qml
         qml/MiniControlBar.qml
         qml/RecordingControls.qml
-        qml/RecordingOutline.qml
         qml/PreviewStage.qml
         qml/RegionSelector.qml
         qml/SettingsPanel.qml
+        qml/TargetTag.qml
         qml/Theme.qml
         qml/components/Field.qml
         qml/components/LevelMeter.qml

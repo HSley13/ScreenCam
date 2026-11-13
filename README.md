@@ -12,11 +12,11 @@ built with CMake. Runs on **macOS, Windows and Linux** from the same code.
 - While recording, your camera floats on the desktop as a **bubble window** you can drag
   anywhere, with the **recording controls attached under it**: timer, what is being recorded,
   **pause** and **stop** (Screen-only recordings get the same controls as a small floating bar).
-  A **coloured frame with a name tag** ("● Recording · Safari — GitHub") marks the screen,
-  window or region being recorded and follows the window if you move it. Before recording,
-  the frame flashes on your choice whenever you change it (or press **Show**), so with two
-  monitors you can see which one you picked. The bubble can be dragged to any monitor. ScreenCam's own
-  windows are left out of the recording on macOS and Windows, so the preview never shows an
+  A small **name tag** ("Safari — GitHub", "Entire screen · Built-in Retina Display") sits on
+  the screen, window or region being recorded and follows the window if you move it. Before
+  recording, it pops up on your choice whenever you change it (or press **Show**), so with two
+  monitors you can see which one you picked. The bubble can be dragged to any monitor.
+  ScreenCam's own windows are left out of the recording on macOS and Windows, so the preview never shows an
   endless "screen inside the screen".
 - **Edit after recording**: a Screen + Camera recording is saved as a *project*. In the editor,
   split the video into parts on a **timeline** and give each part its own bubble position,
@@ -258,7 +258,7 @@ runs two of these pipelines — screen-only and camera-only — into a project):
 
 The camera bubble you see while recording is a real always-on-top window, so you can see
 yourself and drag it out of the way of what you're showing. But it is **not** recorded as
-part of the screen: ScreenCam's own windows (main window, bubble, controls, outline) are left
+part of the screen: ScreenCam's own windows (main window, bubble, controls, name tag) are left
 out of every screen capture, and the camera is recorded on its own track.
 
 - **macOS:** Qt's screen capture (AVCaptureScreenInput) records everything on the display and
@@ -440,8 +440,8 @@ Dependencies point downwards only: `qml → app → export → media → core`.
 - **`FloatingBubble.qml`, `MiniControlBar.qml`, `RegionSelector.qml`** — the desktop bubble
   window, the floating recording controls, and the full-screen rubber band for regions.
 - **`RecordingControls.qml`** — the recording pill (timer, `Capture.targetLabel`, pause, stop)
-  used under the bubble and in the mini bar. **`RecordingOutline.qml`** — a click-through
-  (`Qt.WindowTransparentForInput`) frame placed from `Capture.targetBounds()` 4× per second.
+  used under the bubble and in the mini bar. **`TargetTag.qml`** — a click-through
+  (`Qt.WindowTransparentForInput`) name tag placed from `Capture.targetBounds()` 4× per second.
 - **`EditorPage.qml`** — two `MediaPlayer`s: screen (with audio) is the master clock; the
   camera follows at `position − cameraOffsetMs`, re-synced on every seek/play/pause and when
   it drifts more than 120 ms. The bubble is the same `CameraBubble` as the recorder, fed by

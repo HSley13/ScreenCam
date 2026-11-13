@@ -86,11 +86,11 @@ public:
     Q_INVOKABLE void refreshWindows();
     QString targetLabel() const;
     /// Where the recorded screen, window or region is on the desktop right now (Qt global
-    /// coordinates), for the outline that marks it. For a screen: its usable area (without
-    /// the menu bar / Dock / taskbar, so the frame isn't hidden under them). Empty for a
+    /// coordinates), for the tag that names it. For a screen: its usable area (without
+    /// the menu bar / Dock / taskbar, so the tag isn't hidden under them). Empty for a
     /// window that is minimized or closed, and in Camera-only mode.
     Q_INVOKABLE QRect targetBounds() const;
-    /// Briefly marks the current target on the desktop ("Show" buttons; see RecordingOutline).
+    /// Briefly marks the current target on the desktop ("Show" buttons; see TargetTag).
     Q_INVOKABLE void identifyTarget() { emit identifyRequested(); }
     /// Size of the video file for the current settings (see computeOutputSize in the .cpp).
     QSize outputSize() const;

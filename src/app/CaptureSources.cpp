@@ -417,7 +417,7 @@ QRect CaptureSources::targetBounds() const {
         }
         return {};
     case RecordingSettings::CaptureTarget::Region: {
-        // The region is stored relative to its screen; the outline needs desktop coordinates.
+        // The region is stored relative to its screen; the tag needs desktop coordinates.
         const QScreen *screen = DeviceCatalog::findScreen(settings->screenId());
         if (screen == nullptr) {
             return {};
