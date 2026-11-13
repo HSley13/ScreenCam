@@ -402,10 +402,12 @@ QRect CaptureSources::targetBounds() const {
         }
         return settings->region().translated(screen->geometry().topLeft());
     }
-    case RecordingSettings::CaptureTarget::Screen:
-        break;
+    case RecordingSettings::CaptureTarget::Screen: {
+        const QScreen *screen = DeviceCatalog::findScreen(settings->screenId());
+        return screen != nullptr ? screen->availableGeometry() : QRect();
     }
-    return {};  // the whole screen: an outline around it would just be the screen's edge
+    }
+    return {};
 }
 
 void CaptureSources::setSelectedWindow(int index) {
