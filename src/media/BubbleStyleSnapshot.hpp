@@ -4,7 +4,7 @@
 
 #include <QColor>
 
-/// Plain copy of the bubble's look and position: safe to copy to the compositor thread.
+/// The bubble's look and position, as a plain value for the compositor thread.
 struct BubbleStyleSnapshot {
     screencam::core::BubbleShape shape = screencam::core::BubbleShape::Circle;
     double size = 0.22;
@@ -15,6 +15,5 @@ struct BubbleStyleSnapshot {
     bool shadow = true;
     screencam::core::PointD center{0.12, 0.84};
 
-    /// Border width in pixels for a canvas of this size.
     double borderPixels(double canvasWidth, double canvasHeight) const;
 };

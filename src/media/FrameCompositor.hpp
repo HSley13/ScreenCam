@@ -12,43 +12,34 @@
 class QPainter;
 class QTimer;
 
-/// What the video frame is made of.
 enum class CompositeLayout {
     ScreenWithBubble,  // screen, camera bubble on top
     ScreenOnly,
     CameraOnly,        // camera fills the frame (16:9 or 9:16)
 };
 
-/// The mouse pointer to draw over the screen picture (see core/Pointer.hpp for why it's drawn
-/// at all). Positions are relative to the *captured* frame, before any region crop.
+/// Positions are relative to the captured frame, before any region crop.
 struct PointerOverlay {
     bool visible = false;
     QPointF tip;            // tip of the arrow, 0..1 of the captured frame
     double height = 0.0;    // arrow height, as a fraction of the captured frame's height
-    bool highlight = false; // yellow halo around it, so viewers find it at a glance
+    bool highlight = false; // yellow halo
     bool arrow = true;      // false: the capture already shows the pointer, add only the halo
 };
 
 struct CompositorConfig {
     QSize canvasSize;  // output video size in pixels
-    // Part of the screen frame to record, normalized (0..1). The whole frame by default; a
-    // smaller rectangle records just a region of the screen.
+    // Normalized part of the screen frame to record (a region, or all of it).
     QRectF sourceCrop{0.0, 0.0, 1.0, 1.0};
     CompositeLayout layout = CompositeLayout::ScreenWithBubble;
     int framesPerSecond = 30;
     BubbleStyleSnapshot bubble;
 };
 
-/// Builds the frames of the video, at a steady frame rate, from the latest screen and camera
-/// frames. Lives on its own thread (see RecordingPipeline) so painting never stalls the UI.
-///
-/// Per tick:  latest QVideoFrames -> QImage -> paint canvas (screen, bubble with shadow,
-/// mask and border) -> NV12 (4:2:0, BT.709) -> QVideoFrame stamped with the *real* elapsed
-/// recording time (pauses excluded) -> frameReady().
-///
-/// Why stamp frames ourselves: the encoder places frames on the timeline only by their
-/// timestamps. Without them it assumes a perfect frame rate, so any late frame would make
-/// the video drift away from the microphone audio.
+/// Paints the video frames at a steady rate from the latest screen and camera frames, on its
+/// own thread. Each frame is converted to NV12 and stamped with the real elapsed recording
+/// time (pauses excluded): without timestamps the encoder assumes a perfect frame rate, and
+/// any late frame would make the video drift away from the audio.
 class FrameCompositor : public QObject {
     Q_OBJECT
 
@@ -60,15 +51,13 @@ public:
     void setBubble(const BubbleStyleSnapshot &bubble);
     void setPointer(const PointerOverlay &pointer) { m_pointer = pointer; }
 
-    // Inputs. Frames are only converted to images when a tick needs them.
+    // Frames are only converted to images when a tick needs them.
     void setScreenFrame(const QVideoFrame &frame);
     void setCameraFrame(const QVideoFrame &frame);
     void setScreenImage(const QImage &image);
     void setCameraImage(const QImage &image);
 
-    /// Paints one canvas from the latest inputs (public for tests).
-    QImage renderCanvas();
-    /// Converts a canvas to an NV12 video frame (no timestamps).
+    QImage renderCanvas();  // public for tests
     static QVideoFrame toNv12Frame(const QImage &canvas, int framesPerSecond);
 
     void start();
@@ -80,8 +69,7 @@ public:
 
 signals:
     void frameReady(const QVideoFrame &frame);
-    /// Video time 0, on the machine's monotonic clock (QElapsedTimer::msecsSinceReference):
-    /// lets two recordings made in parallel be lined up afterwards.
+    /// Video time 0 on the monotonic clock, so parallel recordings can be lined up afterwards.
     void clockStarted(qint64 referenceMs);
 
 private:
@@ -90,8 +78,7 @@ private:
     void drawCamera(QPainter &painter, const QRectF &target, bool mirrored) const;
     void drawScreen(QPainter &painter, const QRectF &canvas) const;
     void drawPointer(QPainter &painter, const QRectF &canvas) const;
-    /// Where the recorded part of the screen picture lands on the canvas, and which part that
-    /// is (normalized crop). Shared by drawScreen() and drawPointer().
+    /// Where the recorded part of the screen lands on the canvas, and which part (`crop`).
     QRectF screenTargetRect(const QRectF &canvas, QRectF *crop) const;
     void drawBubble(QPainter &painter);
     const QImage &shadowFor(const QSize &bubbleSize, double radius);
@@ -111,16 +98,16 @@ private:
     QTimer *m_timer = nullptr;
     bool m_running = false;
     QElapsedTimer m_clock;
-    qint64 m_pausedNs = 0;         // total time spent paused
+    qint64 m_pausedNs = 0;
     qint64 m_pauseStartedNs = -1;  // >= 0 while paused
     qint64 m_lastTimestampUs = -1;
 
-    // The blurred shadow only changes when the bubble's size/shape does: cache it.
+    // Shadow and mask only change with the bubble's size and shape.
     QImage m_shadow;
     QSize m_shadowKeySize;
     double m_shadowKeyRadius = -1.0;
     int m_shadowPadding = 0;
-    // Same for the anti-aliased shape mask.
+
     QImage m_mask;
     QSize m_maskKeySize;
     double m_maskKeyRadius = -1.0;

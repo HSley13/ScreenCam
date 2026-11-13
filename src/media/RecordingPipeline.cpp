@@ -9,20 +9,17 @@ RecordingPipeline::RecordingPipeline(QObject *parent)
     m_session.setRecorder(&m_recorder);
     m_session.setVideoFrameInput(&m_videoInput);
 
-    // The compositor paints on its own thread; it is deleted when that thread ends.
-    m_compositor = new FrameCompositor;
+    m_compositor = new FrameCompositor;  // deleted when its thread ends
     m_compositor->moveToThread(&m_thread);
     connect(&m_thread, &QThread::finished, m_compositor, &QObject::deleteLater);
     m_thread.setObjectName(QStringLiteral("ScreenCam compositor"));
     m_thread.start();
 
-    // Different threads -> queued: frames arrive here on the main thread.
     connect(m_compositor, &FrameCompositor::frameReady, this, &RecordingPipeline::sendFrame);
     connect(m_compositor, &FrameCompositor::clockStarted, this, &RecordingPipeline::clockStarted);
     connect(&m_recorder, &QMediaRecorder::recorderStateChanged, this, &RecordingPipeline::onRecorderStateChanged);
 
-    // Long recordings can take a few seconds to close (the MP4 index is written at the end),
-    // so be generous before declaring the encoder stuck.
+    // Long recordings take a few seconds to close (the MP4 index is written at the end).
     m_stopTimeout.setSingleShot(true);
     m_stopTimeout.setInterval(20000);
     connect(&m_stopTimeout, &QTimer::timeout, this, [this] {
@@ -72,7 +69,6 @@ bool RecordingPipeline::start(const Request &request) {
     m_stopping = false;
     m_outputPath = request.outputPath;
 
-    // MP4 + H.264 + AAC plays everywhere (QuickTime, Windows, browsers, phones).
     QMediaFormat format(QMediaFormat::MPEG4);
     format.setVideoCodec(QMediaFormat::VideoCodec::H264);
     format.setAudioCodec(QMediaFormat::AudioCodec::AAC);
@@ -129,13 +125,11 @@ void RecordingPipeline::stop() {
     // Blocking: once this returns, the compositor emits no more frames.
     onCompositor([](FrameCompositor *c) { c->stop(); }, Qt::BlockingQueuedConnection);
     if (m_recorder.recorderState() == QMediaRecorder::StoppedState) {
-        // The recorder never got going (or already ended): it won't report "stopped" again,
-        // so finish now instead of waiting for a signal that never comes.
+        // Never got going, or already ended: no "stopped" will follow.
         finish();
         return;
     }
-    // Normally the recorder reports StoppedState within a second. If the encoder hangs, don't
-    // leave the app stuck in "Saving…": give up after a while and report it.
+    // An encoder that hangs mustn't leave the app stuck in "Saving…".
     m_stopTimeout.start();
     m_recorder.stop();
 }
@@ -144,7 +138,7 @@ void RecordingPipeline::sendFrame(const QVideoFrame &frame) {
     if (!m_active || m_stopping || m_paused) {
         return;
     }
-    // false = the encoder's queue is full (or not ready yet): drop rather than block.
+    // The encoder's queue is full (or not ready): drop rather than block.
     if (!m_videoInput.sendVideoFrame(frame)) {
         m_droppedFrames++;
     }

@@ -15,7 +15,6 @@ QList<RecordingEntry> scan(const QString &folder) {
     QSet<QString> exports;  // videos that belong to a project: not listed separately
 
     const QDir dir(folder);
-    // 1) Projects.
     for (const QFileInfo &info : dir.entryInfoList({QStringLiteral("*.screencam")}, QDir::Dirs | QDir::NoDotAndDotDot)) {
         const std::optional<Project> project = Project::load(info.absoluteFilePath());
         if (!project.has_value()) {
@@ -34,7 +33,6 @@ QList<RecordingEntry> scan(const QString &folder) {
         }
         entries.append(entry);
     }
-    // 2) Finished videos.
     for (const QFileInfo &info : dir.entryInfoList({QStringLiteral("*.mp4")}, QDir::Files)) {
         if (exports.contains(info.absoluteFilePath())) {
             continue;

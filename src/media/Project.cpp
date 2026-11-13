@@ -116,7 +116,7 @@ bool Project::save(QString *error) const {
         {"lastExport", lastExport},
         {"segments", segmentArray},
     };
-    // QSaveFile writes to a temporary file and renames it: a crash never leaves half a file.
+    // Written to a temporary file and renamed: a crash never leaves half a file.
     QSaveFile file(jsonPath());
     if (!file.open(QIODevice::WriteOnly)) {
         if (error != nullptr) {
