@@ -37,5 +37,51 @@
     <!-- Lets iPhone Continuity Camera show up in the camera list on macOS 14+. -->
     <key>NSCameraUseContinuityCameraDeviceType</key>
     <true/>
+
+    <!-- ".screencam" projects: Finder shows each project folder as one document with the
+         ScreenCam icon, and double-clicking it opens it in ScreenCam's editor. ("Show Package
+         Contents" still reveals screen.mp4 / camera.mp4 / project.json inside.) -->
+    <key>UTExportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>com.hsley13.screencam.project</string>
+            <key>UTTypeDescription</key>
+            <string>ScreenCam Project</string>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>com.apple.package</string>
+                <string>public.composite-content</string>
+            </array>
+            <key>UTTypeIconFile</key>
+            <string>${MACOSX_BUNDLE_ICON_FILE}</string>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>screencam</string>
+                </array>
+            </dict>
+        </dict>
+    </array>
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>ScreenCam Project</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>LSHandlerRank</key>
+            <string>Owner</string>
+            <key>LSTypeIsPackage</key>
+            <true/>
+            <key>CFBundleTypeIconFile</key>
+            <string>${MACOSX_BUNDLE_ICON_FILE}</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>com.hsley13.screencam.project</string>
+            </array>
+        </dict>
+    </array>
 </dict>
 </plist>

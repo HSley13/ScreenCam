@@ -1,5 +1,6 @@
 // Entry point: create the application, pick a style, load the QML front end.
 #include <QApplication>
+#include <QFileOpenEvent>
 #include <QCommandLineParser>
 #include <QIcon>
 #include <QQmlError>
@@ -7,6 +8,43 @@
 #include <QQmlApplicationEngine>
 #include <QQuickStyle>
 #include <QQuickWindow>
+
+namespace {
+
+/// macOS hands a document double-clicked in Finder (a ".screencam" project) to the running
+/// app as a QFileOpenEvent — also at launch, when the app was started by that double-click.
+/// Forward it to Main.qml's openEditor(); keep it until the UI exists if it comes too early.
+class FileOpenHandler : public QObject {
+public:
+    explicit FileOpenHandler(QQmlApplicationEngine *engine)
+        : m_engine(engine) {}
+
+    QString takePending() {
+        QString path = m_pending;
+        m_pending.clear();
+        return path;
+    }
+
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override {
+        if (event->type() != QEvent::FileOpen) {
+            return QObject::eventFilter(watched, event);
+        }
+        const QString path = static_cast<QFileOpenEvent *>(event)->file();
+        if (m_engine->rootObjects().isEmpty()) {
+            m_pending = path;
+        } else {
+            QMetaObject::invokeMethod(m_engine->rootObjects().constFirst(), "openEditor", Q_ARG(QString, path));
+        }
+        return true;
+    }
+
+private:
+    QQmlApplicationEngine *m_engine;
+    QString m_pending;
+};
+
+}  // namespace
 
 int main(int argc, char *argv[]) {
     // QApplication rather than QGuiApplication: the tray icon (Qt.labs.platform) falls back to
@@ -66,6 +104,13 @@ int main(int argc, char *argv[]) {
             QCoreApplication::exit(EXIT_FAILURE);
         },
         Qt::QueuedConnection);
+    FileOpenHandler fileOpenHandler(&engine);
+    app.installEventFilter(&fileOpenHandler);
+    QCoreApplication::processEvents();  // a Finder double-click may already be waiting
+    if (initialProject.isEmpty()) {
+        initialProject = fileOpenHandler.takePending();
+    }
+
     // Main.qml declares `initialProject`; it switches to the editor when it's set.
     engine.setInitialProperties({{QStringLiteral("initialProject"), initialProject}});
     engine.loadFromModule("ScreenCam", "Main");
