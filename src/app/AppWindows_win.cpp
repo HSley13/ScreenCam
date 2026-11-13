@@ -50,7 +50,6 @@ QString fileDescription(const QString &exePath) {
     return QString::fromWCharArray(text).trimmed();
 }
 
-/// Display name of the app that owns a process.
 QString appNameOf(DWORD pid) {
     HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
     if (process == nullptr) {
@@ -62,8 +61,7 @@ QString appNameOf(DWORD pid) {
     if (QueryFullProcessImageNameW(process, 0, buffer, &size)) {
         const QString exe = QString::fromWCharArray(buffer, static_cast<int>(size));
         const QString baseName = QFileInfo(exe).completeBaseName();
-        // Store apps (Calculator, Photos ...) are hosted by ApplicationFrameHost.exe; their
-        // window title already is the app name, so don't prefix "Application Frame Host".
+        // Store apps are hosted by ApplicationFrameHost.exe; their title is the app name.
         if (baseName.compare(QStringLiteral("ApplicationFrameHost"), Qt::CaseInsensitive) != 0) {
             name = fileDescription(exe);
             if (name.isEmpty()) {
@@ -92,8 +90,8 @@ BOOL CALLBACK collectWindow(HWND hwnd, LPARAM param) {
 
     const LONG_PTR style = GetWindowLongPtrW(hwnd, GWL_STYLE);
     const LONG_PTR exStyle = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
-    // The taskbar rule: a window gets a button unless it's a tool window, a non-activating
-    // overlay, or owned by another window (dialogs, pop-ups) — WS_EX_APPWINDOW overrides.
+    // The taskbar rule: no tool windows, non-activating overlays or owned windows, unless
+    // WS_EX_APPWINDOW.
     const bool forcedAppWindow = (exStyle & WS_EX_APPWINDOW) != 0;
     const bool owned = GetWindow(hwnd, GW_OWNER) != nullptr;
     traits.toolWindow =
@@ -101,8 +99,6 @@ BOOL CALLBACK collectWindow(HWND hwnd, LPARAM param) {
     traits.hasWindowControls =
         (style & WS_CAPTION) == WS_CAPTION || (style & (WS_MINIMIZEBOX | WS_MAXIMIZEBOX)) != 0;
 
-    // "Cloaked" windows are on another virtual desktop, or suspended Store apps: listed as
-    // visible but not actually on screen.
     DWORD cloaked = 0;
     if (SUCCEEDED(DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, &cloaked, sizeof(cloaked)))) {
         traits.cloaked = cloaked != 0;
@@ -166,8 +162,7 @@ QRect appWindowBounds(quintptr id) {
     if (FAILED(DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &rect, sizeof(rect)))) {
         GetWindowRect(hwnd, &rect);
     }
-    // Windows answers in physical pixels; Qt places windows in scaled (logical) units per
-    // screen. Convert relative to the monitor the window is on.
+    // Physical pixels -> Qt's logical units, relative to the window's monitor.
     const HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
     MONITORINFO info{};
     info.cbSize = sizeof(info);

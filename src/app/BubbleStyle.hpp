@@ -12,10 +12,8 @@
 class QJSEngine;
 class QQmlEngine;
 
-/// How the camera bubble looks and where it sits (QML singleton `BubbleStyle`).
-///
-/// Position is stored as a *normalized* centre (0..1), never in pixels, so it means the same
-/// thing in the small preview and in a 4K recording. All geometry comes from core/BubbleGeometry.
+/// How the camera bubble looks and where it sits (QML singleton `BubbleStyle`). The position
+/// is a normalized centre, so it means the same in the preview and in a 4K recording.
 class BubbleStyle : public QObject {
     Q_OBJECT
     QML_ELEMENT
@@ -48,8 +46,7 @@ public:
     static BubbleStyle *instance();
     static BubbleStyle *create(QQmlEngine *qmlEngine, QJSEngine *jsEngine);
 
-    /// `persistent`: load/save with QSettings (the app-wide default look). The editor uses a
-    /// non-persistent instance for "the segment under the playhead".
+    /// `persistent`: kept in QSettings (the default look). The editor's isn't.
     explicit BubbleStyle(QObject *parent = nullptr, bool persistent = false);
 
     Shape shape() const { return static_cast<Shape>(m_style.shape); }
@@ -71,27 +68,21 @@ public:
     int revision() const { return m_revision; }
 
     BubbleStyleSnapshot snapshot() const { return m_style; }
-    /// Replaces everything at once (one styleChanged).
     void setSnapshot(const BubbleStyleSnapshot &style);
 
-    /// Bubble rectangle on a canvas of the given size (pixels of that canvas).
     Q_INVOKABLE QRectF rectFor(double canvasWidth, double canvasHeight) const;
-    /// Corner radius for a bubble of the given size.
     Q_INVOKABLE double radiusFor(double bubbleWidth, double bubbleHeight) const;
-    /// Border width in pixels on a canvas of the given size.
     Q_INVOKABLE double borderFor(double canvasWidth, double canvasHeight) const;
-    /// Moves the centre (normalized), keeping the bubble inside the canvas.
     Q_INVOKABLE void moveCenter(double normalizedX, double normalizedY, double canvasWidth, double canvasHeight);
-    /// Snaps to the nearest edge/centre anchors (called when a drag ends).
+    /// When a drag ends.
     Q_INVOKABLE void snap(double canvasWidth, double canvasHeight, double threshold = 0.06);
-    /// Puts the bubble in a corner.
     Q_INVOKABLE void placeInCorner(Corner corner, double canvasWidth, double canvasHeight);
 
 signals:
     void styleChanged();
 
 private:
-    void commit();  // persist + notify
+    void commit();  // save + notify
     screencam::core::SizeD bubbleSizeOn(double canvasWidth, double canvasHeight) const;
 
     bool m_persistent = false;

@@ -1,6 +1,5 @@
-// Linux (X11): the window manager's client list plus the EWMH hints every desktop sets
-// (window type, state, allowed actions). Wayland has no global window list for apps; there
-// Qt can't capture windows anyway, and we report "unsupported".
+// Linux (X11): the window manager's client list plus EWMH hints. Wayland has no global window
+// list (and Qt can't capture windows there): "unsupported".
 #include "app/AppWindows.hpp"
 #include "core/WindowFilter.hpp"
 
@@ -18,7 +17,7 @@
 
 namespace {
 
-/// Reads a window property of 32-bit items (ATOM, CARDINAL, WINDOW lists).
+/// A property of 32-bit items (ATOM, CARDINAL, WINDOW lists).
 template <typename T>
 std::vector<T> readList(Display *display, Window window, const char *name, Atom type) {
     std::vector<T> items;
@@ -79,7 +78,7 @@ QString windowTitle(Display *display, Window window) {
     return title;
 }
 
-/// "Firefox", "Code" ... from WM_CLASS (the class part, which is the app's name).
+/// WM_CLASS's class part: "Firefox", "Code", ...
 QString appName(Display *display, Window window) {
     XClassHint hint{};
     QString name;
@@ -131,8 +130,7 @@ QHash<quintptr, AppWindow> listAppWindows(bool *supported) {
                             contains(display, types, "_NET_WM_WINDOW_TYPE_NOTIFICATION") ||
                             contains(display, states, "_NET_WM_STATE_SKIP_TASKBAR");
 
-        // If the window manager publishes allowed actions, an app window can be minimized
-        // or maximized; without the property (simple WMs), assume it can.
+        // Simple window managers don't publish allowed actions: assume it can.
         const auto actions = readList<Atom>(display, window, "_NET_WM_ALLOWED_ACTIONS", XA_ATOM);
         traits.hasWindowControls = actions.empty() || contains(display, actions, "_NET_WM_ACTION_MINIMIZE") ||
                                    contains(display, actions, "_NET_WM_ACTION_MAXIMIZE_HORZ");
@@ -170,7 +168,7 @@ QRect appWindowBounds(quintptr id) {
     int y = 0;
     Window child = None;
     XTranslateCoordinates(display, window, DefaultRootWindow(display), 0, 0, &x, &y, &child);
-    // X11 measures in physical pixels; Qt divides by the scale factor (QT_SCALE_FACTOR etc.).
+    // Physical pixels -> Qt's scaled units.
     const QScreen *screen = QGuiApplication::primaryScreen();
     const qreal ratio = screen != nullptr ? screen->devicePixelRatio() : 1.0;
     return QRect(qRound(x / ratio), qRound(y / ratio), qRound(attributes.width / ratio),

@@ -1,5 +1,4 @@
-// macOS: ScreenCaptureKit, filtered to "this display, without ScreenCam's windows".
-// Compiled with ARC (-fobjc-arc, see CMakeLists.txt): Objective-C objects free themselves.
+// ScreenCaptureKit: "this display, without ScreenCam's windows". Compiled with ARC.
 #import <CoreMedia/CoreMedia.h>
 #import <CoreVideo/CoreVideo.h>
 #import <ScreenCaptureKit/ScreenCaptureKit.h>
@@ -17,15 +16,14 @@
 
 namespace {
 
-/// A QVideoFrame that reads straight from ScreenCaptureKit's pixel buffer — no copy of a
-/// 5-megapixel image 30 times per second. The buffer stays alive while any QVideoFrame (the
-/// preview, the recorder) still holds it.
+/// Zero-copy: a frame reads straight from ScreenCaptureKit's pixel buffer, kept alive while
+/// any QVideoFrame holds it.
 class PixelBufferVideoBuffer final : public QAbstractVideoBuffer {
 public:
     explicit PixelBufferVideoBuffer(CVPixelBufferRef buffer)
         : m_buffer(CVPixelBufferRetain(buffer))
         , m_format(QSize(static_cast<int>(CVPixelBufferGetWidth(buffer)), static_cast<int>(CVPixelBufferGetHeight(buffer))),
-                   QVideoFrameFormat::Format_BGRA8888) {}  // = kCVPixelFormatType_32BGRA byte order
+                   QVideoFrameFormat::Format_BGRA8888) {}  // kCVPixelFormatType_32BGRA
 
     ~PixelBufferVideoBuffer() override {
         unmap();
@@ -35,7 +33,7 @@ public:
     MapData map(QVideoFrame::MapMode mode) override {
         MapData data;
         if (mode != QVideoFrame::ReadOnly || m_locked) {
-            return data;  // screen pictures are read, never written
+            return data;  // read-only
         }
         if (CVPixelBufferLockBaseAddress(m_buffer, kCVPixelBufferLock_ReadOnly) != kCVReturnSuccess) {
             return data;
@@ -63,8 +61,7 @@ private:
     bool m_locked = false;
 };
 
-/// QScreen doesn't expose its display id; tell screens apart by where they are. Quartz and
-/// Qt use the same desktop coordinates (points, from the top-left of the main display).
+/// QScreen doesn't expose its display id: match by position (Quartz and Qt agree on it).
 CGDirectDisplayID displayIdOf(const QScreen *screen) {
     CGDirectDisplayID displays[16];
     uint32_t count = 0;
@@ -85,10 +82,8 @@ CGDirectDisplayID displayIdOf(const QScreen *screen) {
 }  // namespace
 
 /// How ScreenCaptureKit's threads reach the C++ object. It can outlive the object (a frame
-/// may still be in flight after we asked the stream to stop), so it holds a pointer that is
-/// cleared under a lock when the object dies, and every answer carries the "generation" of
-/// the attempt it belongs to: answers for an older attempt (before a screen switch) are
-/// dropped.
+/// may be in flight after stop), so the pointer is cleared under a lock, and answers for an
+/// older attempt (generation) are dropped.
 struct ExcludingScreenCapture::Bridge {
     std::mutex mutex;
     ExcludingScreenCapture *owner = nullptr;
@@ -117,8 +112,7 @@ struct ExcludingScreenCapture::Bridge {
         });
     }
 
-    // The answer to "what's on screen?" (step 1 of starting) arrived: continue on the
-    // owner's thread. (Defined after Private, which it calls.)
+    // Step 1's answer: continue on the owner's thread. (Defined after Private.)
     void deliverContent(quint64 generation, id content, NSError *error, CGDirectDisplayID displayId, int framesPerSecond);
 
     void deliverError(quint64 generation, const QString &message, bool permission) {
@@ -129,7 +123,6 @@ struct ExcludingScreenCapture::Bridge {
     }
 };
 
-// Receives frames (on our capture queue) and "stream stopped" news from ScreenCaptureKit.
 API_AVAILABLE(macos(12.3))
 @interface ScreenCamStreamOutput : NSObject <SCStreamOutput, SCStreamDelegate>
 - (instancetype)initWithBridge:(std::shared_ptr<ExcludingScreenCapture::Bridge>)bridge generation:(quint64)generation;
@@ -154,8 +147,7 @@ API_AVAILABLE(macos(12.3))
     if (type != SCStreamOutputTypeScreen || !CMSampleBufferIsValid(sampleBuffer)) {
         return;
     }
-    // When nothing on screen changed, ScreenCaptureKit sends "idle" samples with no new
-    // picture; only "complete" ones carry a frame.
+    // Only "complete" samples carry a picture ("idle" ones mean nothing changed).
     CFArrayRef attachments = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, false);
     if (attachments == nullptr || CFArrayGetCount(attachments) == 0) {
         return;
@@ -186,8 +178,7 @@ struct ExcludingScreenCapture::Private {
     id output = nil;  // ScreenCamStreamOutput
     dispatch_queue_t queue = dispatch_queue_create("ScreenCam screen capture", DISPATCH_QUEUE_SERIAL);
 
-    // Step 2 of starting (main thread): we know what's on screen; build the filter and go.
-    // (`content` is an SCShareableContent, typed `id` for the same reason as `stream`.)
+    // Step 2 (main thread): build the filter and start. (`content`: SCShareableContent.)
     void startStream(ExcludingScreenCapture *q, id contentObject, NSError *error, CGDirectDisplayID displayId,
                      int framesPerSecond) {
         if (@available(macOS 12.3, *)) {
@@ -231,8 +222,7 @@ void ExcludingScreenCapture::Private::startStreamWith(ExcludingScreenCapture *q,
         return;
     }
 
-    // The whole point: leave out every window of this app — preview, bubble, controls,
-    // name tag — including ones opened after the capture started.
+    // Every window of this app, including ones opened later.
     NSMutableArray<SCRunningApplication *> *excluded = [NSMutableArray array];
     const pid_t ownPid = getpid();
     for (SCRunningApplication *app in content.applications) {
@@ -244,8 +234,7 @@ void ExcludingScreenCapture::Private::startStreamWith(ExcludingScreenCapture *q,
                                                 excludingApplications:excluded
                                                      exceptingWindows:@[]];
 
-    // Full resolution of the display (a "looks like 1512 × 982" Retina screen is
-    // 3024 × 1964 pixels): the region crop and the encoder scale it down as needed.
+    // Full pixel resolution: the region crop and the encoder scale it down as needed.
     SCStreamConfiguration *config = [[SCStreamConfiguration alloc] init];
     size_t width = static_cast<size_t>(display.width) * 2;
     size_t height = static_cast<size_t>(display.height) * 2;
@@ -259,10 +248,9 @@ void ExcludingScreenCapture::Private::startStreamWith(ExcludingScreenCapture *q,
     config.height = height;
     config.minimumFrameInterval = CMTimeMake(1, framesPerSecond);
     config.pixelFormat = kCVPixelFormatType_32BGRA;
-    config.colorSpaceName = kCGColorSpaceSRGB;  // what the rest of the pipeline assumes
+    config.colorSpaceName = kCGColorSpaceSRGB;
     config.queueDepth = 8;  // the preview and the recorder each hold on to a frame
-    // No pointer from macOS: ScreenCam draws it itself (core/Pointer.hpp), so it's there even
-    // when an app hides it (a PowerPoint slide show does) and can be highlighted.
+    // ScreenCam draws the pointer itself (core/Pointer.hpp).
     config.showsCursor = NO;
 
     ScreenCamStreamOutput *streamOutput = [[ScreenCamStreamOutput alloc] initWithBridge:bridge
@@ -296,7 +284,7 @@ ExcludingScreenCapture::ExcludingScreenCapture(QObject *parent)
 ExcludingScreenCapture::~ExcludingScreenCapture() {
     {
         std::lock_guard<std::mutex> lock(d->bridge->mutex);
-        d->bridge->owner = nullptr;  // late frames find nobody home
+        d->bridge->owner = nullptr;
     }
     m_generation++;
     if (@available(macOS 12.3, *)) {
@@ -354,8 +342,7 @@ void ExcludingScreenCapture::restart() {
         return;
     }
     if (@available(macOS 12.3, *)) {
-        // Step 1: ask what's on screen (displays, apps). The answer comes on another thread;
-        // Bridge brings it back to this one.
+        // Step 1: ask what's on screen; the answer comes on another thread.
         const quint64 generation = ++m_generation;
         const CGDirectDisplayID displayId = displayIdOf(m_screen);
         const int framesPerSecond = m_framesPerSecond;

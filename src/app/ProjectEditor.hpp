@@ -12,16 +12,10 @@
 
 class ProjectExporter;
 
-/// The editing model behind the editor page (QML type `ProjectEditor`, one per open project).
-///
-/// Why a C++ object and not plain QML: the timeline rules (where a cut may go, who inherits a
-/// deleted segment's time) live in core/Timeline + media/Project and are unit-tested there; the
-/// exporter reads the very same project.json. QML only displays this and forwards gestures.
-///
-/// The "current" segment is the one under the playhead. Its look is exposed as `style`, a
-/// regular BubbleStyle, so the existing bubble UI (CameraBubble drag/resize, BubbleSection
-/// sliders) edits a segment exactly like it edits the recording defaults. Every change is
-/// copied back into the segment and saved automatically shortly after.
+/// The editor's model (QML type `ProjectEditor`, one per open project); the timeline rules
+/// live in core/Timeline and media/Project. The segment under the playhead is exposed as
+/// `style`, a regular BubbleStyle, so the same bubble UI edits it as edits the recording
+/// defaults. Changes are saved automatically shortly after.
 class ProjectEditor : public QObject {
     Q_OBJECT
     QML_ELEMENT
@@ -45,7 +39,7 @@ class ProjectEditor : public QObject {
     Q_PROPERTY(BubbleStyle *style READ style CONSTANT)
     Q_PROPERTY(bool dirty READ dirty NOTIFY dirtyChanged)
     Q_PROPERTY(QString errorText READ errorText NOTIFY errorTextChanged)
-    // Export (false when built without the FFmpeg development files).
+    // False when built without the FFmpeg development files.
     Q_PROPERTY(bool exportAvailable READ exportAvailable CONSTANT)
     Q_PROPERTY(bool exporting READ exporting NOTIFY exportStateChanged)
     Q_PROPERTY(double exportProgress READ exportProgress NOTIFY exportProgressChanged)
@@ -55,37 +49,30 @@ public:
     explicit ProjectEditor(QObject *parent = nullptr);
     ~ProjectEditor() override;  // saves pending changes
 
-    /// Opens a ".screencam" folder (a path, a file:// URL, or the project.json inside it).
+    /// A path, a file:// URL, or the project.json inside the folder.
     Q_INVOKABLE bool open(const QString &location);
-    /// Saves pending changes and forgets the project.
     Q_INVOKABLE void close();
 
-    /// Makes the segment playing at `timeMs` current (called as the playhead moves).
     Q_INVOKABLE void selectAt(qint64 timeMs);
     void select(int index);
 
     Q_INVOKABLE bool canSplitAt(qint64 timeMs) const;
-    /// Cuts the segment under `timeMs`; the part after the cut becomes current.
+    /// The part after the cut becomes current.
     Q_INVOKABLE int splitAt(qint64 timeMs);
-    /// Deletes the current segment (its neighbour takes over its time).
     Q_INVOKABLE bool removeCurrent();
-    /// Copies the current segment's look and position to every segment.
     Q_INVOKABLE void applyToAll();
 
     Q_INVOKABLE qint64 segmentStart(int index) const;
     Q_INVOKABLE qint64 segmentEnd(int index) const;
-    /// "1:05.3" — the editor needs tenths of a second, the recorder's timer doesn't.
+    /// "1:05.3"
     Q_INVOKABLE QString formatTime(qint64 ms) const;
 
-    /// Writes project.json now (normally done automatically after each change).
     Q_INVOKABLE bool save();
     Q_INVOKABLE void showInFileManager() const;
 
-    /// Renders the finished video next to the project ("<name>.mp4"; re-exporting replaces
-    /// the previous export of this project). Runs in the background.
+    /// "<name>.mp4" next to the project, in the background; replaces the previous export.
     Q_INVOKABLE bool exportVideo();
     Q_INVOKABLE void cancelExport();
-    /// Opens the exported video in the system's player.
     Q_INVOKABLE void playLastExport() const;
 
     bool loaded() const { return m_loaded; }
@@ -96,10 +83,9 @@ public:
     bool hasCamera() const { return m_loaded && !m_project.cameraFile.isEmpty(); }
     QSize canvasSize() const { return m_project.canvasSize; }
     qint64 durationMs() const { return m_project.durationMs; }
-    /// The player knows the real length; the recorder's estimate may be off by a few frames.
+    /// The player's length; the recorder's estimate may be off by a few frames.
     void setDurationMs(qint64 durationMs);
     qint64 cameraOffsetMs() const { return m_project.cameraOffsetMs; }
-    /// Fine-tune lip sync between the two files.
     void setCameraOffsetMs(qint64 offsetMs);
     qint64 recordedCameraOffsetMs() const { return m_recordedOffsetMs; }
     QVariantList segments() const;
@@ -116,12 +102,11 @@ public:
     bool exporting() const;
     double exportProgress() const { return m_exportProgress; }
     QString lastExport() const { return m_project.lastExport; }
-    /// Where exportVideo() will write (exposed for tests).
     QString exportPath() const;
 
 signals:
     void projectChanged();
-    void durationChanged();  // separate: must not make QML reload the video sources
+    void durationChanged();  // separate, so QML doesn't reload the videos
     void segmentsChanged();
     void currentChanged();
     void cameraOffsetChanged();
@@ -142,10 +127,10 @@ private:
     int m_current = 0;
     qint64 m_recordedOffsetMs = 0;
     BubbleStyle *m_style = nullptr;
-    bool m_loadingStyle = false;  // true while we push a segment into m_style ourselves
+    bool m_loadingStyle = false;  // pushing a segment into m_style ourselves
     bool m_dirty = false;
     QString m_errorText;
     QTimer m_autosave;
-    ProjectExporter *m_exporter = nullptr;  // created on first export
+    ProjectExporter *m_exporter = nullptr;
     double m_exportProgress = 0.0;
 };

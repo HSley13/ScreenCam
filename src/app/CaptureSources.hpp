@@ -26,21 +26,17 @@
 class QJSEngine;
 class QQmlEngine;
 
-/// Owns the live inputs: what is recorded (a screen, a region of it, or one window) and the
-/// camera (QML singleton `Capture`). "Screen" frames below means frames of that target.
-///
-/// Each input runs in its own QMediaCaptureSession with a QVideoSink we own; every frame is
-///  - forwarded to any number of QML VideoOutputs (the previews), and
-///  - re-emitted as screenFrameArrived/cameraFrameArrived for the recorder's compositor.
-/// Inputs only run while needed: the preview is visible (`previewEnabled`) or a recording is
-/// in progress — so the camera light and screen-capture indicator are off otherwise.
+/// The live inputs (QML singleton `Capture`): what is recorded (a screen, a region or a
+/// window; "screen" frames below) and the camera. Frames go to the QML previews and to the
+/// recorder. Inputs only run while previewed or recording, so the camera light stays off
+/// otherwise.
 class CaptureSources : public QObject {
     Q_OBJECT
     QML_NAMED_ELEMENT(Capture)
     QML_SINGLETON
 
     Q_PROPERTY(bool previewEnabled READ previewEnabled WRITE setPreviewEnabled NOTIFY previewEnabledChanged)
-    // The floating camera bubble is on screen: keep the camera (only) running for it.
+    // Keeps the camera (only) running for the floating bubble.
     Q_PROPERTY(bool bubbleVisible READ bubbleVisible WRITE setBubbleVisible NOTIFY bubbleVisibleChanged)
     Q_PROPERTY(bool screenActive READ screenActive NOTIFY screenActiveChanged)
     Q_PROPERTY(bool cameraActive READ cameraActive NOTIFY cameraActiveChanged)
@@ -51,13 +47,12 @@ class CaptureSources : public QObject {
     Q_PROPERTY(QSize screenSize READ screenSize NOTIFY outputSizeChanged)
     Q_PROPERTY(QSize cameraResolution READ cameraResolution NOTIFY cameraResolutionChanged)
     Q_PROPERTY(QSize outputSize READ outputSize NOTIFY outputSizeChanged)
-    // Normalized part of the screen frame that is recorded (whole frame unless Region).
+
     Q_PROPERTY(QRectF sourceCrop READ sourceCrop NOTIFY outputSizeChanged)
-    // App windows that can be recorded: [{ id: <index>, name: "App — Title" }], sorted by
-    // name; see refreshWindows().
+    // [{ id: <index>, name: "App — Title" }], sorted by name
     Q_PROPERTY(QVariantList windows READ windows NOTIFY windowsChanged)
     Q_PROPERTY(int selectedWindow READ selectedWindow WRITE setSelectedWindow NOTIFY windowsChanged)
-    // What is being recorded, in words: "Safari — GitHub", "Entire screen · Built-in Display".
+    // "Safari — GitHub", "Entire screen · Built-in Display"
     Q_PROPERTY(QString targetLabel READ targetLabel NOTIFY targetChanged)
 
 public:
@@ -68,7 +63,6 @@ public:
     void setPreviewEnabled(bool enabled);
     bool bubbleVisible() const { return m_bubbleVisible; }
     void setBubbleVisible(bool visible);
-    /// Keeps the inputs running while recording, even if the window is hidden.
     void setRecordingActive(bool active);
 
     bool screenActive() const {
@@ -79,32 +73,25 @@ public:
     QString cameraError() const { return m_cameraError; }
     QString backendProblem() const { return m_backendProblem; }
     QSize cameraResolution() const { return m_cameraResolution; }
-    /// Real pixel size of what is recorded: the screen, the region, or the window.
+    /// Real pixel size of what is recorded.
     QSize screenSize() const;
     QRectF sourceCrop() const;
     QVariantList windows() const;
     int selectedWindow() const { return m_selectedWindow; }
     void setSelectedWindow(int index);
-    /// Re-reads the list of open windows (windows come and go, so the UI asks on demand).
     Q_INVOKABLE void refreshWindows();
     QString targetLabel() const;
-    /// Where the recorded screen, window or region is on the desktop right now (Qt global
-    /// coordinates), for the tag that names it. For a screen: its usable area (without
-    /// the menu bar / Dock / taskbar, so the tag isn't hidden under them). Empty for a
-    /// window that is minimized or closed.
+    /// On the desktop, for the tag that names it. A screen's usable area (so the tag isn't
+    /// under the menu bar or Dock); empty for a minimized or closed window.
     Q_INVOKABLE QRect targetBounds() const;
-    /// Where the mouse pointer goes in the next video frame (see core/Pointer.hpp): only while
-    /// the mouse is over what's recorded and "Show mouse pointer" is on. When the capture
-    /// method already contains the pointer, only the highlight halo is added (if wanted).
+    /// When the capture already shows the pointer, only the highlight halo is added.
     PointerOverlay pointerOverlay() const;
-    /// The newest screen / camera picture. A recording starts with these: a still screen
-    /// (ScreenCaptureKit only sends a picture when something changes) would otherwise give
-    /// the new recording nothing to show until the first change.
+    /// A recording starts with these: ScreenCaptureKit only sends a picture when something
+    /// changes, so a still screen would otherwise give it nothing to show.
     QVideoFrame lastScreenFrame() const { return m_lastScreenFrame; }
     QVideoFrame lastCameraFrame() const { return m_lastCameraFrame; }
-    /// Briefly marks the current target on the desktop ("Show" buttons; see TargetTag).
+    /// "Show" buttons: briefly name the target on the desktop (TargetTag).
     Q_INVOKABLE void identifyTarget() { emit identifyRequested(); }
-    /// Size of the video file for the current settings (see computeOutputSize in the .cpp).
     QSize outputSize() const;
 
     Q_INVOKABLE void addScreenPreview(QVideoSink *sink);
@@ -140,33 +127,29 @@ private:
     QRect pointerTargetBounds() const;
     void setCameraError(const QString &error);
 
-    // Screen
     QMediaCaptureSession m_screenSession;
     QScreenCapture m_screenCapture;
-    // Used instead of m_screenCapture where available (macOS): records the screen *without*
-    // ScreenCam's own windows — no endless mirror in the preview, no bubble in the video.
+    // Where available (macOS), instead of m_screenCapture: leaves ScreenCam's own windows out.
     ExcludingScreenCapture m_excludingCapture;
     const bool m_useExcludingCapture = ExcludingScreenCapture::isSupported();
     QVideoSink m_screenSink;
     QList<QPointer<QVideoSink>> m_screenPreviews;
     QString m_screenError;
 
-    // Window (alternative target, same downstream path as the screen)
     QMediaCaptureSession m_windowSession;
     QWindowCapture m_windowCapture;
     QVideoSink m_windowSink;
     QList<QCapturableWindow> m_windows;
     QStringList m_windowLabels;   // parallel to m_windows
-    QList<quintptr> m_windowIds;  // native ids, to keep the selection across refreshes
+    QList<quintptr> m_windowIds;  // keeps the selection across refreshes
     int m_selectedWindow = -1;
     QSize m_windowFrameSize;
     // A window's place, re-read at most every 150 ms (the pointer is sampled ~60x/s).
     mutable QRect m_pointerWindowBounds;
     mutable QElapsedTimer m_pointerWindowBoundsAge;
-    QTimer m_screenWatchdog;  // fires if an active screen capture delivers no frame
+    QTimer m_screenWatchdog;  // no frame from an active screen capture
     bool m_screenFrameSeen = false;
 
-    // Camera
     QMediaCaptureSession m_cameraSession;
     std::unique_ptr<QCamera> m_camera;
     QString m_cameraDeviceId;
@@ -176,7 +159,7 @@ private:
     QSize m_cameraResolution;
     QVideoFrame m_lastScreenFrame;
     QVideoFrame m_lastCameraFrame;
-    QTimer m_demoCamera;  // feeds DeviceCatalog::demoCameraImage() instead of a real camera
+    QTimer m_demoCamera;  // SCREENCAM_DEMO_CAMERA
 
     QString m_backendProblem;
     bool m_previewEnabled = false;

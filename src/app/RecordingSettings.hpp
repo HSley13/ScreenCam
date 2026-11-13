@@ -10,8 +10,7 @@
 class QJSEngine;
 class QQmlEngine;
 
-/// Everything the user picks in the sidebar, saved automatically (QSettings) so the app
-/// opens the way you left it. QML singleton `RecordingSettings`; C++ uses instance().
+/// The sidebar's choices, kept in QSettings (QML singleton `RecordingSettings`).
 class RecordingSettings : public QObject {
     Q_OBJECT
     QML_ELEMENT
@@ -19,7 +18,7 @@ class RecordingSettings : public QObject {
 
     Q_PROPERTY(QString screenId READ screenId WRITE setScreenId NOTIFY screenIdChanged)
     Q_PROPERTY(CaptureTarget captureTarget READ captureTarget WRITE setCaptureTarget NOTIFY captureTargetChanged)
-    // Region to record, in the selected screen's logical coordinates (empty = none chosen yet).
+    // In the selected screen's logical coordinates; empty until chosen.
     Q_PROPERTY(QRect region READ region WRITE setRegion NOTIFY regionChanged)
     Q_PROPERTY(QString cameraId READ cameraId WRITE setCameraId NOTIFY cameraIdChanged)
     Q_PROPERTY(QString microphoneId READ microphoneId WRITE setMicrophoneId NOTIFY microphoneIdChanged)
@@ -28,18 +27,16 @@ class RecordingSettings : public QObject {
     Q_PROPERTY(int countdownSeconds READ countdownSeconds WRITE setCountdownSeconds NOTIFY countdownSecondsChanged)
     Q_PROPERTY(bool hideWindowWhileRecording READ hideWindowWhileRecording WRITE setHideWindowWhileRecording NOTIFY
                    hideWindowWhileRecordingChanged)
-    // The mouse pointer in the video, and a yellow halo around it to point things out.
     Q_PROPERTY(bool showPointer READ showPointer WRITE setShowPointer NOTIFY showPointerChanged)
     Q_PROPERTY(bool highlightPointer READ highlightPointer WRITE setHighlightPointer NOTIFY highlightPointerChanged)
     Q_PROPERTY(QString outputFolder READ outputFolder NOTIFY outputFolderChanged)
     Q_PROPERTY(QUrl outputFolderUrl READ outputFolderUrl WRITE setOutputFolderUrl NOTIFY outputFolderChanged)
 
 public:
-    /// Which part of the desktop is recorded.
     enum class CaptureTarget {
-        Screen,  // a whole display: every app on it
-        Window,  // one application window
-        Region,  // a rectangle you drag out on a display
+        Screen,
+        Window,
+        Region,  // a rectangle dragged out on a display
     };
     Q_ENUM(CaptureTarget)
 
@@ -56,7 +53,7 @@ public:
     void setCameraId(const QString &id);
     QString microphoneId() const { return m_microphoneId; }
     void setMicrophoneId(const QString &id);
-    int resolution() const { return m_resolution; }  // a screencam::core::ResolutionPreset value
+    int resolution() const { return m_resolution; }  // a core::ResolutionPreset
     void setResolution(int preset);
     int frameRate() const { return m_frameRate; }
     void setFrameRate(int fps);
@@ -72,10 +69,8 @@ public:
     QUrl outputFolderUrl() const;
     void setOutputFolderUrl(const QUrl &url);
 
-
-    /// [{ value: <preset>, label: "1080p" }, ...] for the resolution picker.
+    /// [{ value: <preset>, label: "1080p" }, ...]
     Q_INVOKABLE QVariantList resolutionOptions() const;
-    /// Opens the output folder in Finder / Explorer / the file manager.
     Q_INVOKABLE void openOutputFolder() const;
 
 signals:
@@ -105,7 +100,7 @@ private:
     QRect m_region;
     QString m_cameraId;
     QString m_microphoneId;
-    int m_resolution = 1;  // FullHD1080
+    int m_resolution = 1;  // 1080p
     int m_frameRate = 30;
     int m_countdownSeconds = 3;
     bool m_hideWindowWhileRecording = true;

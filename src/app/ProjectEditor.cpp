@@ -19,8 +19,7 @@ constexpr int kAutosaveDelayMs = 600;  // long enough to coalesce a drag into on
 ProjectEditor::ProjectEditor(QObject *parent)
     : QObject(parent)
     , m_style(new BubbleStyle(this, false)) {
-    // Drags and slider moves change the style many times per second; saving each one would
-    // hammer the disk, so a short single-shot timer batches them.
+    // A drag changes the style many times per second: save once it's quiet.
     m_autosave.setSingleShot(true);
     m_autosave.setInterval(kAutosaveDelayMs);
     connect(&m_autosave, &QTimer::timeout, this, [this] {
@@ -38,7 +37,6 @@ ProjectEditor::~ProjectEditor() {
 bool ProjectEditor::open(const QString &location) {
     close();
 
-    // Accept whatever QML hands us: a FolderDialog URL, a plain path, or the JSON file itself.
     QString path = location;
     const QUrl url(location);
     if (url.isLocalFile()) {
@@ -110,7 +108,7 @@ bool ProjectEditor::canSplitAt(qint64 timeMs) const {
     if (!m_loaded) {
         return false;
     }
-    Project copy = m_project;  // splitAt() is the single source of the rule; try it on a copy
+    Project copy = m_project;  // splitAt() owns the rule: try it on a copy
     return copy.splitAt(timeMs) >= 0;
 }
 
@@ -122,7 +120,7 @@ int ProjectEditor::splitAt(qint64 timeMs) {
     if (index < 0) {
         return -1;
     }
-    m_current = index;  // the new part: that's what you want to move next
+    m_current = index;
     loadCurrentStyle();
     emit segmentsChanged();
     emit currentChanged();
@@ -134,8 +132,7 @@ bool ProjectEditor::removeCurrent() {
     if (!m_loaded || !m_project.removeSegment(m_current)) {
         return false;
     }
-    // Whoever inherited the time is now under the playhead: the previous segment, or the
-    // (renumbered) first one when the first was removed.
+    // The segment that inherited the time.
     m_current = std::max(0, m_current - 1);
     loadCurrentStyle();
     emit segmentsChanged();
@@ -211,7 +208,6 @@ bool ProjectEditor::save() {
 
 void ProjectEditor::showInFileManager() const {
     if (m_loaded) {
-        // Open the folder that *contains* the project, so it shows up selected-ish in context.
         QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(m_project.folder).absolutePath()));
     }
 }
@@ -238,7 +234,7 @@ void ProjectEditor::setDurationMs(qint64 durationMs) {
     }
     m_project.durationMs = durationMs;
     emit durationChanged();
-    emit segmentsChanged();  // the last segment's end moved
+    emit segmentsChanged();
     emit currentChanged();
     markDirty();
 }
@@ -290,8 +286,7 @@ void ProjectEditor::loadCurrentStyle() {
     if (!m_loaded) {
         return;
     }
-    // setSnapshot() emits styleChanged, which normally means "the user edited the bubble";
-    // the flag tells onStyleEdited() that this one is us, not an edit.
+    // Tells onStyleEdited() that this styleChanged is us, not an edit.
     m_loadingStyle = true;
     m_style->setSnapshot(m_project.segments.at(static_cast<std::size_t>(m_current)).style);
     m_loadingStyle = false;
@@ -315,7 +310,7 @@ void ProjectEditor::markDirty() {
         m_dirty = true;
         emit dirtyChanged();
     }
-    m_autosave.start();  // restarts: saves once things have been quiet for a moment
+    m_autosave.start();
 }
 
 void ProjectEditor::setErrorText(const QString &text) {
@@ -346,9 +341,9 @@ QString ProjectEditor::exportPath() const {
         return QString();
     }
     if (!m_project.lastExport.isEmpty()) {
-        return m_project.lastExport;  // re-export after more edits: replace it
+        return m_project.lastExport;  // replace it
     }
-    // "Talk.screencam" -> "Talk.mp4" beside it; "Talk 2.mp4" if that name is taken already.
+    // "Talk.screencam" -> "Talk.mp4", or "Talk 2.mp4" if taken.
     const QFileInfo projectInfo(m_project.folder);
     const QDir parent = projectInfo.absoluteDir();
     QString path = parent.filePath(projectInfo.completeBaseName() + QStringLiteral(".mp4"));
@@ -363,7 +358,7 @@ bool ProjectEditor::exportVideo() {
     if (!m_loaded || exporting()) {
         return false;
     }
-    save();  // the export reads the same state that's on disk
+    save();  // the export reads what's on disk
     if (m_exporter == nullptr) {
         m_exporter = new ProjectExporter(this);
         connect(m_exporter, &ProjectExporter::progress, this, [this](double ratio) {

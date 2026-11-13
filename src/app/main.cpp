@@ -1,4 +1,3 @@
-// Entry point: create the application, pick a style, load the QML front end.
 #include "app/QmlHotReloader.hpp"
 
 #include <QApplication>
@@ -13,9 +12,8 @@
 
 namespace {
 
-/// macOS hands a document double-clicked in Finder (a ".screencam" project) to the running
-/// app as a QFileOpenEvent — also at launch, when the app was started by that double-click.
-/// Forward it to Main.qml's openEditor(); keep it until the UI exists if it comes too early.
+/// A project double-clicked in Finder arrives as a QFileOpenEvent, also at launch: forward it
+/// to Main.qml's openEditor(), or keep it until the UI exists.
 class FileOpenHandler : public QObject {
 public:
     explicit FileOpenHandler(QQmlApplicationEngine *engine)
@@ -49,8 +47,7 @@ private:
 }  // namespace
 
 int main(int argc, char *argv[]) {
-    // QApplication rather than QGuiApplication: the tray icon (Qt.labs.platform) falls back to
-    // Qt Widgets on Windows and Linux, which requires a QApplication instance.
+    // Not QGuiApplication: Qt.labs.platform's tray icon uses Qt Widgets on Windows and Linux.
     QApplication app(argc, argv);
     QApplication::setOrganizationName("hsley13");
     QApplication::setOrganizationDomain("hsley13.github.io");
@@ -59,8 +56,7 @@ int main(int argc, char *argv[]) {
     QApplication::setApplicationVersion(SCREENCAM_VERSION);
     QApplication::setWindowIcon(QIcon(QStringLiteral(":/screencam/screencam.png")));
 
-    // "Basic" is the fully customizable Qt Quick Controls style: it looks identical on every OS,
-    // whereas native styles (macOS, Windows) ignore most custom backgrounds/colours.
+    // Native styles ignore most custom backgrounds and colours.
     QQuickStyle::setStyle("Basic");
 
     QCommandLineParser parser;
@@ -79,7 +75,7 @@ int main(int argc, char *argv[]) {
     const QCommandLineOption openProject(
         QStringLiteral("open"), QStringLiteral("Open a .screencam project in the editor."), QStringLiteral("project"));
     parser.addOption(openProject);
-    // A bare path works too (what the OS passes when a project folder is dropped on the app).
+    // What the OS passes when a project is dropped on the app.
     parser.addPositionalArgument(QStringLiteral("project"), QStringLiteral("Optional .screencam project to open."));
     parser.process(app);
 
@@ -90,7 +86,7 @@ int main(int argc, char *argv[]) {
 
     QQmlApplicationEngine engine;
 
-    // Count QML warnings (binding errors, missing types, ...) so --self-test can fail on them.
+    // --self-test fails on any QML warning.
     int qmlWarnings = 0;
     engine.setOutputWarningsToStandardError(false);
     QObject::connect(&engine, &QQmlEngine::warnings, &app, [&qmlWarnings](const QList<QQmlError> &warnings) {
@@ -122,7 +118,6 @@ int main(int argc, char *argv[]) {
         initialProject = fileOpenHandler.takePending();
     }
 
-    // Main.qml declares `initialProject`; it switches to the editor when it's set.
     engine.setInitialProperties({{QStringLiteral("initialProject"), initialProject}});
     engine.loadFromModule("ScreenCam", "Main");
     started = !engine.rootObjects().isEmpty();

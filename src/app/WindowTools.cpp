@@ -12,8 +12,7 @@
 #endif
 
 #if defined(Q_OS_MACOS)
-// Implemented in WindowTools_mac.mm (needs Objective-C for NSWindow).
-bool screencamExcludeNativeWindowFromCapture(WId windowId);
+bool screencamExcludeNativeWindowFromCapture(WId windowId);  // WindowTools_mac.mm
 #endif
 
 WindowTools *WindowTools::instance() {
