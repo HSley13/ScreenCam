@@ -40,7 +40,7 @@ from **Recordings** in the main window, or double-click it in Finder.
 ## Install
 
 You need **Qt 6.8+ with Qt Multimedia's FFmpeg backend** (the Qt Online Installer includes it),
-**CMake 3.25+**, **Ninja** and a C++20 compiler.
+**CMake 3.25+**, `make` and a C++20 compiler (on macOS both come with the Xcode Command Line Tools).
 
 **macOS**
 
@@ -61,7 +61,7 @@ scripts/install.sh        # installs into ~/.local (app menu entry included)
 **Windows** (x64 Native Tools prompt)
 
 ```bat
-cmake --preset release -DCMAKE_PREFIX_PATH=C:/Qt/6.8.3/msvc2022_64
+cmake --preset release -G "NMake Makefiles" -DCMAKE_PREFIX_PATH=C:/Qt/6.8.3/msvc2022_64
 cmake --build --preset release
 cmake --install build/release --prefix "%LOCALAPPDATA%/Programs/ScreenCam"
 ```
