@@ -80,6 +80,7 @@ if(SCREENCAM_BUILD_APP)
         src/media/MediaBackendCheck.cpp src/media/MediaBackendCheck.hpp
         src/media/Project.cpp src/media/Project.hpp
         src/media/RecordingPipeline.cpp src/media/RecordingPipeline.hpp
+        src/media/RecordingIndex.cpp src/media/RecordingIndex.hpp
     )
     target_include_directories(screencam_media PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(screencam_media PUBLIC screencam_core Qt6::Gui Qt6::Multimedia)
@@ -125,6 +126,7 @@ if(SCREENCAM_BUILD_APP)
         screencam_add_qt_test(tst_pipeline)
         screencam_add_qt_test(tst_media_backend)
         screencam_add_qt_test(tst_project)
+        screencam_add_qt_test(tst_recording_index)
 
         # A tiny real project (synthetic screen + camera) that the editor and export tests open.
         qt_add_executable(make_sample_project tests/make_sample_project.cpp)
