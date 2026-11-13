@@ -37,6 +37,12 @@ step "Building"
 cmake --build --preset release
 
 step "Installing into $PREFIX"
+if [[ "$(uname -s)" == "Darwin" ]]; then
+    # macdeployqt prints one long command line and then nothing until it's done, which looks
+    # like a hang: it is copying ~50 Qt frameworks, the plugins and FFmpeg into the app and
+    # re-signing each of them.
+    echo "This step takes about 3 minutes and shows no progress while it works — let it run."
+fi
 mkdir -p "$PREFIX"
 if [[ "$(uname -s)" == "Darwin" ]]; then
     # Replace the previous copy instead of copying over it (removed files would linger).
