@@ -61,6 +61,11 @@ ApplicationWindow {
         editor.bringToFront();
     }
 
+    // Hot reload (debug builds) reopens these after rebuilding the UI.
+    function openProjects() {
+        return Object.keys(window.editorWindows);
+    }
+
     Component {
         id: editorComponent
         EditorWindow {}
