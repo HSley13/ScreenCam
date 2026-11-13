@@ -402,6 +402,14 @@ void FrameCompositor::tick() {
     if (timestamp <= m_lastTimestampUs) {
         return;  // timestamps must strictly increase
     }
+    // No picture yet (the first screen/camera frame is still on its way): write nothing rather
+    // than a black frame, so a recording never starts with a blank flash.
+    refreshImages();
+    const bool hasPicture = m_config.layout == CompositeLayout::CameraOnly ? !m_cameraImage.isNull()
+                                                                           : !m_screenImage.isNull();
+    if (!hasPicture) {
+        return;
+    }
     QVideoFrame frame = toNv12Frame(renderCanvas(), m_config.framesPerSecond);
     if (!frame.isValid()) {
         return;

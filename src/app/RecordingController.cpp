@@ -229,6 +229,9 @@ void RecordingController::startPipelines() {
     const bool screenStarted = m_pipeline.start(request);
     if (screenStarted) {
         m_pendingPipelines++;
+        if (capture->lastScreenFrame().isValid()) {
+            m_pipeline.pushScreenFrame(capture->lastScreenFrame());  // what's on screen right now
+        }
     }
     if (screenStarted) {
         // The camera's full frame, unmirrored: mirroring and cropping happen at export time.
@@ -242,6 +245,9 @@ void RecordingController::startPipelines() {
         cameraRequest.outputPath = m_project.cameraPath();
         if (m_cameraPipeline.start(cameraRequest)) {
             m_pendingPipelines++;
+            if (capture->lastCameraFrame().isValid()) {
+                m_cameraPipeline.pushCameraFrame(capture->lastCameraFrame());
+            }
         } else {
             m_project.cameraFile.clear();
         }

@@ -97,6 +97,11 @@ public:
     /// the mouse is over what's recorded and "Show mouse pointer" is on. When the capture
     /// method already contains the pointer, only the highlight halo is added (if wanted).
     PointerOverlay pointerOverlay() const;
+    /// The newest screen / camera picture. A recording starts with these: a still screen
+    /// (ScreenCaptureKit only sends a picture when something changes) would otherwise give
+    /// the new recording nothing to show until the first change.
+    QVideoFrame lastScreenFrame() const { return m_lastScreenFrame; }
+    QVideoFrame lastCameraFrame() const { return m_lastCameraFrame; }
     /// Briefly marks the current target on the desktop ("Show" buttons; see TargetTag).
     Q_INVOKABLE void identifyTarget() { emit identifyRequested(); }
     /// Size of the video file for the current settings (see computeOutputSize in the .cpp).
@@ -169,6 +174,8 @@ private:
     QList<QPointer<QVideoSink>> m_cameraPreviews;
     QString m_cameraError;
     QSize m_cameraResolution;
+    QVideoFrame m_lastScreenFrame;
+    QVideoFrame m_lastCameraFrame;
     QTimer m_demoCamera;  // feeds DeviceCatalog::demoCameraImage() instead of a real camera
 
     QString m_backendProblem;

@@ -121,6 +121,7 @@ CaptureSources::CaptureSources(QObject *parent)
     connect(&m_windowSink, &QVideoSink::videoFrameChanged, this, &CaptureSources::onTargetFrame);
     connect(&m_cameraSink, &QVideoSink::videoFrameChanged, this, [this](const QVideoFrame &frame) {
         forward(m_cameraPreviews, frame);
+        m_lastCameraFrame = frame;
         if (frame.size() != m_cameraResolution && frame.isValid()) {
             m_cameraResolution = frame.size();  // trust real frames over the requested format
             emit cameraResolutionChanged();
@@ -245,6 +246,7 @@ void CaptureSources::onTargetFrame(const QVideoFrame &frame) {
         emit outputSizeChanged();
     }
     forward(m_screenPreviews, frame);
+    m_lastScreenFrame = frame;
     emit screenFrameArrived(frame);
 }
 
@@ -255,10 +257,12 @@ void CaptureSources::updateScreen() {
     if (m_useExcludingCapture) {
         if (m_excludingCapture.screen() != screen) {
             m_excludingCapture.setScreen(screen);
+            m_lastScreenFrame = QVideoFrame();  // belonged to the previous screen
             emit outputSizeChanged();
         }
     } else if (m_screenCapture.screen() != screen) {
         m_screenCapture.setScreen(screen);
+        m_lastScreenFrame = QVideoFrame();
         emit outputSizeChanged();
     }
     if (!m_backendProblem.isEmpty()) {
@@ -296,6 +300,7 @@ void CaptureSources::updateScreen() {
         if (m_windowCapture.window() != window) {
             m_windowCapture.setWindow(window);
             m_windowFrameSize = QSize();
+            m_lastScreenFrame = QVideoFrame();
             emit outputSizeChanged();
         }
     }
