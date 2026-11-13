@@ -48,6 +48,15 @@ RecordingController::RecordingController(QObject *parent)
         }
     });
 
+    // The mouse moves even when nothing else on screen changes (and some captures only
+    // deliver a picture on change), so it is sampled on its own clock, not per screen frame.
+    m_pointerTicker.setInterval(16);
+    connect(&m_pointerTicker, &QTimer::timeout, this, [this] {
+        if (m_pipeline.isActive() && !m_pipeline.isPaused()) {
+            m_pipeline.pushPointer(CaptureSources::instance()->pointerOverlay());
+        }
+    });
+
     m_elapsedTicker.setInterval(250);
     connect(&m_elapsedTicker, &QTimer::timeout, this, &RecordingController::elapsedChanged);
 
@@ -411,6 +420,12 @@ void RecordingController::clearError() {
 void RecordingController::setState(State state) {
     if (m_state != state) {
         m_state = state;
+        // Sample the pointer only while a recording is running (no wake-ups when idle).
+        if (m_state == State::Recording || m_state == State::Paused) {
+            m_pointerTicker.start();
+        } else {
+            m_pointerTicker.stop();
+        }
         emit stateChanged();
     }
 }

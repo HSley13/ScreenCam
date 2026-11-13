@@ -187,6 +187,10 @@ void FrameCompositor::drawPointer(QPainter &painter, const QRectF &canvas) const
         painter.drawEllipse(tip, height * 1.1, height * 1.1);
     }
     // The classic arrow, in units of its height: tip at (0, 0), pointing up-left.
+    if (!m_pointer.arrow) {
+        painter.restore();
+        return;
+    }
     static const QPointF kArrow[] = {{0.00, 0.00}, {0.00, 0.80}, {0.20, 0.64}, {0.34, 0.96},
                                      {0.46, 0.91}, {0.32, 0.60}, {0.57, 0.60}};
     QPolygonF arrow;

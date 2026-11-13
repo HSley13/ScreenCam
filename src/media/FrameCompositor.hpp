@@ -26,6 +26,7 @@ struct PointerOverlay {
     QPointF tip;            // tip of the arrow, 0..1 of the captured frame
     double height = 0.0;    // arrow height, as a fraction of the captured frame's height
     bool highlight = false; // yellow halo around it, so viewers find it at a glance
+    bool arrow = true;      // false: the capture already shows the pointer, add only the halo
 };
 
 struct CompositorConfig {

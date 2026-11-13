@@ -63,6 +63,8 @@ RecordingSettings::RecordingSettings(QObject *parent)
     m_frameRate = m_store.value("frameRate", m_frameRate).toInt();
     m_countdownSeconds = m_store.value("countdown", m_countdownSeconds).toInt();
     m_hideWindowWhileRecording = m_store.value("hideWindow", m_hideWindowWhileRecording).toBool();
+    m_showPointer = m_store.value("showPointer", m_showPointer).toBool();
+    m_highlightPointer = m_store.value("highlightPointer", m_highlightPointer).toBool();
     m_cameraOnlyOrientation =
         static_cast<Orientation>(m_store.value("cameraOnlyOrientation", static_cast<int>(m_cameraOnlyOrientation)).toInt());
     m_outputFolder = m_store.value("outputFolder", defaultOutputFolder()).toString();
@@ -116,6 +118,14 @@ void RecordingSettings::setCountdownSeconds(int seconds) {
 
 void RecordingSettings::setHideWindowWhileRecording(bool hide) {
     assign(m_hideWindowWhileRecording, hide, "hideWindow", &RecordingSettings::hideWindowWhileRecordingChanged);
+}
+
+void RecordingSettings::setShowPointer(bool show) {
+    assign(m_showPointer, show, "showPointer", &RecordingSettings::showPointerChanged);
+}
+
+void RecordingSettings::setHighlightPointer(bool highlight) {
+    assign(m_highlightPointer, highlight, "highlightPointer", &RecordingSettings::highlightPointerChanged);
 }
 
 void RecordingSettings::setCameraOnlyOrientation(Orientation orientation) {

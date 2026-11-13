@@ -261,7 +261,9 @@ void ExcludingScreenCapture::Private::startStreamWith(ExcludingScreenCapture *q,
     config.pixelFormat = kCVPixelFormatType_32BGRA;
     config.colorSpaceName = kCGColorSpaceSRGB;  // what the rest of the pipeline assumes
     config.queueDepth = 8;  // the preview and the recorder each hold on to a frame
-    config.showsCursor = YES;
+    // No pointer from macOS: ScreenCam draws it itself (core/Pointer.hpp), so it's there even
+    // when an app hides it (a PowerPoint slide show does) and can be highlighted.
+    config.showsCursor = NO;
 
     ScreenCamStreamOutput *streamOutput = [[ScreenCamStreamOutput alloc] initWithBridge:bridge
                                                                              generation:q->m_generation];
