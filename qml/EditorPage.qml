@@ -16,6 +16,7 @@ Item {
     id: page
 
     required property string folder
+    readonly property string projectName: project.name
     signal closeRequested()
 
     readonly property bool playing: screenPlayer.playbackState === MediaPlayer.PlayingState
@@ -192,7 +193,7 @@ Item {
             spacing: 12
 
             StyledButton {
-                text: qsTr("‹  New recording")
+                text: qsTr("Close")
                 onClicked: page.closeRequested()
             }
 

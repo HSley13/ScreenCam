@@ -16,11 +16,16 @@ ApplicationWindow {
     title: qsTr("ScreenCam")
     color: Theme.window
 
-    // Set from the command line (`ScreenCam --open My.screencam`), see main.cpp.
+    // Set from the command line (`ScreenCam --open My.screencam`) or a Finder double-click,
+    // see main.cpp.
     property string initialProject: ""
-    // The project open in the editor; empty = the recorder is showing.
-    property string editorFolder: ""
-    readonly property bool editing: editorFolder.length > 0
+    // Open editor windows, by project folder: opening the same project again just brings its
+    // window to the front. (Also keeps them referenced, so they aren't garbage-collected.)
+    property var editorWindows: ({})
+    // The editor window you're working in, if any. While it's active the live camera and
+    // screen are paused (camera light off) and the floating bubble steps aside.
+    property Window activeEditor: null
+    readonly property bool editing: activeEditor !== null
 
     // macOS asks for camera/microphone access the first time; elsewhere this is a no-op.
     Component.onCompleted: {
@@ -31,9 +36,45 @@ ApplicationWindow {
     }
 
     function openEditor(folder: string) {
-        window.editorFolder = "";  // re-opening the same project reloads it
-        window.editorFolder = folder;
-        window.bringToFront();
+        const key = folder.replace(/^file:\/\//, "").replace(/\/(project\.json)?$/, "");
+        const existing = window.editorWindows[key];
+        if (existing) {
+            existing.bringToFront();
+            return;
+        }
+        const editor = editorComponent.createObject(window, { folder: folder });
+        window.editorWindows[key] = editor;
+        editor.activeChanged.connect(() => {
+            if (editor.active) {
+                window.activeEditor = editor;
+            } else if (window.activeEditor === editor) {
+                window.activeEditor = null;
+            }
+        });
+        editor.finished.connect(() => {
+            if (window.activeEditor === editor) {
+                window.activeEditor = null;
+            }
+            delete window.editorWindows[key];
+            editor.destroy();
+        });
+        editor.bringToFront();
+    }
+
+    Component {
+        id: editorComponent
+        EditorWindow {}
+    }
+
+    // Closing the recorder window quits ScreenCam (open editors save as they close). Not in
+    // the middle of a recording, though: then it just steps aside.
+    onClosing: (close) => {
+        if (Recorder.busy) {
+            close.accepted = false;
+            window.showMinimized();
+            return;
+        }
+        Qt.quit();
     }
     // Never record ScreenCam's own window (this also stops the preview from showing itself
     // in an endless loop). Re-applied whenever the window is shown again.
@@ -52,7 +93,6 @@ ApplicationWindow {
 
     // --- Recorder -----------------------------------------------------------------------------
     RowLayout {
-        visible: !window.editing
         anchors.fill: parent
         anchors.margins: 16
         spacing: 16
@@ -87,17 +127,6 @@ ApplicationWindow {
         }
     }
 
-    // --- Editor (created only while a project is open) ----------------------------------------
-    Loader {
-        anchors.fill: parent
-        anchors.margins: 16
-        active: window.editing
-        sourceComponent: EditorPage {
-            folder: window.editorFolder
-            onCloseRequested: window.editorFolder = ""
-        }
-    }
-
     CountdownOverlay {
         anchors.fill: parent
     }
@@ -114,7 +143,7 @@ ApplicationWindow {
     // recording controls attached while recording.
     FloatingBubble {
         id: floatingBubble
-        visible:  !window.editing && RecordingSettings.mode === RecordingSettings.ScreenAndCamera
+        visible: !window.editing && RecordingSettings.mode === RecordingSettings.ScreenAndCamera
                  && RecordingSettings.cameraId.length > 0 && Devices.cameraAllowed
     }
 
