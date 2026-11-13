@@ -1,6 +1,7 @@
 #include "app/WindowTools.hpp"
 
 #include <QCoreApplication>
+#include <QGuiApplication>
 #include <QJSEngine>
 #include <QWindow>
 
@@ -42,9 +43,17 @@ bool WindowTools::excludeFromCapture(QWindow *window) {
     if (window == nullptr) {
         return false;
     }
+    // winId() is only a native window (NSView / HWND) on the native platform plugin; under
+    // `offscreen` (the UI tests) it's just a number, and using it as a pointer crashes.
 #if defined(Q_OS_MACOS)
+    if (QGuiApplication::platformName() != QLatin1String("cocoa")) {
+        return false;
+    }
     return screencamExcludeNativeWindowFromCapture(window->winId());
 #elif defined(Q_OS_WIN)
+    if (QGuiApplication::platformName() != QLatin1String("windows")) {
+        return false;
+    }
     return SetWindowDisplayAffinity(reinterpret_cast<HWND>(window->winId()), WDA_EXCLUDEFROMCAPTURE) != FALSE;
 #else
     return false;
