@@ -5,7 +5,7 @@
 namespace screencam::core {
 
 std::string formatElapsed(double seconds) {
-    if (!(seconds > 0.0)) {  // written this way so NaN also lands here
+    if (!(seconds > 0.0)) {  // also catches NaN
         seconds = 0.0;
     }
     const long long total = static_cast<long long>(seconds);
