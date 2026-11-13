@@ -13,19 +13,12 @@
 class QJSEngine;
 class QQmlEngine;
 
-/// The record button's brain (QML singleton `Recorder`).
-///
-/// Screen + Camera mode records a *project* (screen.mp4 + camera.mp4 + project.json, see
-/// Project) with two pipelines in parallel, so the camera bubble can be placed — and moved over
-/// time — in the editor afterwards. Screen-only and Camera-only modes write a finished MP4.
+/// Runs a recording (QML singleton `Recorder`). It records a project: screen.mp4 and
+/// camera.mp4 with two pipelines in parallel, so the bubble can be placed in the editor.
 ///
 ///   Idle ──start()──► Countdown ──(n s)──► Recording ◄──togglePause()──► Paused
 ///     ▲                   │ cancel               │ stop()                  │ stop()
 ///     └───────────────────┴──────────── Finalizing ◄─────────────────────────┘
-///
-/// It snapshots the settings when recording begins, keeps the capture inputs alive while the
-/// window is hidden, forwards live frames and bubble edits to the pipeline, and reports the
-/// saved file.
 class RecordingController : public QObject {
     Q_OBJECT
     QML_NAMED_ELEMENT(Recorder)
@@ -59,13 +52,11 @@ public:
     Q_INVOKABLE void togglePause();
     Q_INVOKABLE void toggleRecording();  // start, or stop if already going
     Q_INVOKABLE void cancelCountdown();
-    /// Plays a finished video, or opens a project in the editor.
     Q_INVOKABLE void openLastRecording();
     Q_INVOKABLE void clearError();
-    /// Where the floating camera bubble's centre is on the desktop (global logical coords).
+    /// The floating bubble's centre on the desktop.
     Q_INVOKABLE void setBubbleDesktopCenter(const QPointF &center);
-    /// That position as a normalized centre inside what is recorded (screen or region), to
-    /// seed the editor's layout; a corner default when it isn't inside (or for windows).
+    /// That centre inside what is recorded, to seed the editor's layout (a corner otherwise).
     screencam::core::PointD bubbleCenterInTarget() const;
 
 signals:
@@ -74,10 +65,8 @@ signals:
     void elapsedChanged();
     void lastRecordingChanged();
     void errorStringChanged();
-    /// The window should get out of the way (minimize) / come back.
     void windowHideRequested();
     void windowShowRequested();
-    /// A project was recorded (or the user asked to reopen it): open it in the editor.
     void openProjectRequested(const QString &folder);
 
 private:
@@ -86,7 +75,6 @@ private:
     QString validate() const;
     void beginRecording();
     void startPipelines();
-    /// One pipeline closed its file (error empty) or failed.
     void onPipelineDone(bool camera, const QString &error);
     void completeProject();
     void finish();
@@ -95,10 +83,10 @@ private:
     QString nextProjectFolder() const;
     qint64 activeMilliseconds() const;
 
-    RecordingPipeline m_pipeline;        // the video (direct modes) or screen.mp4 (projects)
-    RecordingPipeline m_cameraPipeline;  // camera.mp4 (projects only)
+    RecordingPipeline m_pipeline;        // screen.mp4
+    RecordingPipeline m_cameraPipeline;  // camera.mp4
     bool m_startingPipelines = false;  // ignore synchronous failures while start() runs
-    int m_pendingPipelines = 0;        // still writing their file
+    int m_pendingPipelines = 0;
     bool m_screenSaved = false;
     bool m_cameraSaved = false;
     qint64 m_screenClockMs = -1;
@@ -108,8 +96,8 @@ private:
     State m_state = State::Idle;
     QTimer m_countdownTimer;
     int m_countdownRemaining = 0;
-    QTimer m_pointerTicker;  // samples the mouse pointer for the video (~60x/s)
-    QTimer m_elapsedTicker;  // refreshes elapsedText a few times per second
+    QTimer m_pointerTicker;  // ~60x/s
+    QTimer m_elapsedTicker;
     QElapsedTimer m_clock;
     qint64 m_pausedMs = 0;
     qint64 m_pauseStartedMs = -1;

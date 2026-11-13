@@ -1,20 +1,11 @@
-# FindFFmpeg
-# ----------
-# Finds the FFmpeg development files (headers + libraries) used by the video exporter:
-# libavformat, libavcodec, libavutil and libswscale.
+# FindFFmpeg: libavformat, libavcodec, libavutil and libswscale, for the exporter.
 #
-# Why not just pkg-config: Windows rarely has it, and on macOS the FFmpeg that Qt's
-# multimedia backend was built against (scripts/build-qt-ffmpeg.sh -> ~/.local/ffmpeg-<ver>)
-# is the one we *want*, so the app and Qt share a single copy of the libraries.
+# Not just pkg-config: Windows rarely has it, and the FFmpeg Qt was built against
+# (~/.local/ffmpeg-<ver>) is the one to use, so the app and Qt share one copy.
+# Search order: FFMPEG_DIR (CMake or environment), ~/.local/ffmpeg-* (newest first),
+# pkg-config, then the usual system locations.
 #
-# Search order:
-#   1. -DFFMPEG_DIR=<prefix> or the FFMPEG_DIR environment variable
-#   2. ~/.local/ffmpeg-*   (newest first; what scripts/build-qt-ffmpeg.sh installs)
-#   3. pkg-config, then the usual system locations (Homebrew, /usr, vcpkg's prefix ...)
-#
-# Result:
-#   FFmpeg_FOUND, FFmpeg_VERSION (libavcodec's), FFmpeg_INCLUDE_DIR
-#   Imported targets FFmpeg::avformat, FFmpeg::avcodec, FFmpeg::avutil, FFmpeg::swscale
+# Defines FFmpeg_FOUND, FFmpeg_VERSION, FFmpeg_INCLUDE_DIR and FFmpeg::<lib> targets.
 
 set(_ffmpeg_hints)
 if(FFMPEG_DIR)
@@ -49,7 +40,7 @@ foreach(_component IN LISTS _ffmpeg_components)
     list(APPEND _ffmpeg_required_vars FFmpeg_${_component}_LIBRARY)
 endforeach()
 
-# Version from libavcodec/version_major.h + version.h (e.g. 61.19.101 for FFmpeg 7.1).
+# libavcodec's version, e.g. 61.19.101 for FFmpeg 7.1.
 if(FFmpeg_INCLUDE_DIR AND EXISTS "${FFmpeg_INCLUDE_DIR}/libavcodec/version.h")
     file(READ "${FFmpeg_INCLUDE_DIR}/libavcodec/version.h" _ffmpeg_version_h)
     set(_ffmpeg_major_h "${FFmpeg_INCLUDE_DIR}/libavcodec/version_major.h")

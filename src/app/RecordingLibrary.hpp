@@ -11,9 +11,8 @@
 class QJSEngine;
 class QQmlEngine;
 
-/// Your recordings, for the "Recordings" list (QML singleton `Library`): the projects and
-/// videos in the output folder, newest first (see RecordingIndex). Re-read when the folder
-/// changes, when the output folder setting changes, and whenever the list is opened.
+/// The "Recordings" list (QML singleton `Library`), re-read when the output folder or its
+/// contents change and whenever the list is opened.
 class RecordingLibrary : public QObject {
     Q_OBJECT
     QML_NAMED_ELEMENT(Library)
@@ -29,9 +28,8 @@ public:
     QVariantList recordings() const;
 
     Q_INVOKABLE void refresh();
-    /// Opens a video in the system's player.
     Q_INVOKABLE void play(const QString &path) const;
-    /// Shows the file or project folder selected in Finder / Explorer (the folder elsewhere).
+    /// Selects it in Finder / Explorer (opens the folder elsewhere).
     Q_INVOKABLE void reveal(const QString &path) const;
 
 signals:

@@ -1,5 +1,4 @@
-// Writes a small but real ScreenCam project (screen.mp4 + camera.mp4 + project.json) made of
-// synthetic pictures. Used as a CTest fixture for the editor smoke test, and handy by hand:
+// Writes a small real project from synthetic pictures (a CTest fixture, and handy by hand):
 //   make_sample_project /tmp/Sample.screencam [seconds]
 #include "media/Project.hpp"
 #include "media/RecordingPipeline.hpp"

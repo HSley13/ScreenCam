@@ -2,8 +2,7 @@ import QtQuick
 import QtQuick.Effects
 import QtMultimedia
 
-// What the camera bubble looks like — shape, video, border, shadow — with no behaviour.
-// Used by the floating desktop bubble and by the editor's preview.
+// The bubble's look (shape, video, border, shadow) without behaviour.
 Item {
     id: view
 
@@ -12,15 +11,13 @@ Item {
     property color borderColor: "white"
     property bool shadowEnabled: true
     property bool mirrored: true
-    property bool live: false          // false: show the placeholder instead of video
+    property bool live: false          // false: the placeholder
     property string placeholderText: ""
-    // true: register the video with the live camera (Capture); false: someone else feeds it
-    // (the editor attaches a MediaPlayer to `video`).
+    // false: someone else feeds `video` (the editor's MediaPlayer).
     property bool feedFromCapture: false
     readonly property alias video: video
 
-    // --- Shadow: a blurred copy of the shape, offset downwards ------------------------------
-    Rectangle {
+    Rectangle {  // shadow
         id: shadowShape
         anchors.fill: parent
         radius: view.cornerRadius
@@ -40,8 +37,7 @@ Item {
         autoPaddingEnabled: true
     }
 
-    // --- Placeholder until there is video --------------------------------------------------
-    Rectangle {
+    Rectangle {  // placeholder
         anchors.fill: parent
         radius: view.cornerRadius
         color: Theme.surfaceRaised
@@ -58,12 +54,11 @@ Item {
         }
     }
 
-    // --- Video, clipped to the shape -----------------------------------------------------------
     VideoOutput {
         id: video
         anchors.fill: parent
-        fillMode: VideoOutput.PreserveAspectCrop  // fill the shape, crop the edges
-        visible: false                            // drawn through the mask effect below
+        fillMode: VideoOutput.PreserveAspectCrop
+        visible: false  // drawn through the mask below
 
         Component.onCompleted: {
             if (view.feedFromCapture) {
@@ -98,15 +93,14 @@ Item {
         maskSource: mask
         maskThresholdMin: 0.5
         maskSpreadAtMin: 1.0
-        // Mirroring the masked result is fine: every shape is left/right symmetric.
+        // Every shape is left/right symmetric, so mirroring after the mask is fine.
         transform: Scale {
             origin.x: view.width / 2
             xScale: view.mirrored ? -1 : 1
         }
     }
 
-    // --- Border ring --------------------------------------------------------------------------
-    Rectangle {
+    Rectangle {  // border
         anchors.fill: parent
         radius: view.cornerRadius
         color: "transparent"

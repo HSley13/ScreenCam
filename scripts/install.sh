@@ -1,13 +1,9 @@
 #!/usr/bin/env bash
-# Installs ScreenCam as a normal app: optimized (Release) build, with Qt and FFmpeg copied
-# inside so it runs on its own, signed with your "ScreenCam Development" identity (so the
-# Camera / Microphone / Screen Recording permissions you granted carry over).
+# Installs a self-contained Release build, signed with "ScreenCam Development" so granted
+# permissions carry over. Run it again to update.
 #
-#   scripts/install.sh                      # macOS: ~/Applications/ScreenCam.app
-#                                           # Linux: ~/.local (app menu entry + icon)
+#   scripts/install.sh                      # macOS: ~/Applications, Linux: ~/.local
 #   PREFIX=/Applications scripts/install.sh # somewhere else
-#
-# Run it again after pulling changes: it replaces the installed copy.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -20,8 +16,7 @@ case "$(uname -s)" in
     *) die "On Windows, see README > Windows (cmake --install with a prefix of your choice)." ;;
 esac
 
-# Use the same Qt as your day-to-day build in build/ (so you don't have to tell CMake where
-# Qt is again), unless CMAKE_PREFIX_PATH already says.
+# The same Qt as build/, unless CMAKE_PREFIX_PATH says otherwise.
 configure_args=(-DSCREENCAM_BUILD_TESTS=OFF)
 if [[ -z "${CMAKE_PREFIX_PATH:-}" && -f build/CMakeCache.txt ]]; then
     qt_dir="$(sed -n 's/^Qt6_DIR:PATH=//p' build/CMakeCache.txt)"
@@ -38,14 +33,12 @@ cmake --build --preset release
 
 step "Installing into $PREFIX"
 if [[ "$(uname -s)" == "Darwin" ]]; then
-    # macdeployqt prints one long command line and then nothing until it's done, which looks
-    # like a hang: it is copying ~50 Qt frameworks, the plugins and FFmpeg into the app and
-    # re-signing each of them.
+    # macdeployqt is silent for minutes, which looks like a hang.
     echo "This step takes about 3 minutes and shows no progress while it works — let it run."
 fi
 mkdir -p "$PREFIX"
 if [[ "$(uname -s)" == "Darwin" ]]; then
-    # Replace the previous copy instead of copying over it (removed files would linger).
+    # Removed files would linger in a copy over the old one.
     rm -rf "$PREFIX/ScreenCam.app"
 fi
 cmake --install build/release --prefix "$PREFIX"
@@ -54,8 +47,7 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
     app="$PREFIX/ScreenCam.app"
     [[ -d "$app" ]] || die "Install finished but $app is missing."
     codesign --verify --deep "$app" || die "The installed app's signature is broken (see README > Permissions)."
-    # Tell macOS about the app now: Spotlight/Launchpad find it, and .screencam projects open
-    # with it on double-click.
+    # Now, so Spotlight finds it and .screencam projects open with it.
     lsregister=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
     if [[ -x "$lsregister" ]]; then
         "$lsregister" -f "$app"

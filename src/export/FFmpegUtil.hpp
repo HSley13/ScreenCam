@@ -1,7 +1,6 @@
 #pragma once
 
-// Small helpers shared by the exporter's reader and writer: RAII owners for FFmpeg's C
-// structs (so every early `return` frees them) and readable error strings.
+// RAII owners for FFmpeg's C structs (every early return frees them) and error strings.
 
 extern "C" {
 #include <libavcodec/avcodec.h>

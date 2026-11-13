@@ -26,8 +26,7 @@ namespace {
 
 constexpr int kScreenWatchdogMs = 4000;
 
-/// The OS's id of a window Qt can capture (CGWindowID / HWND / X11 Window), or 0 if this Qt
-/// doesn't let us see it. Qt keeps it in the private part of QCapturableWindow.
+/// 0 when this Qt doesn't expose QCapturableWindow's private native id.
 quintptr nativeWindowId(const QCapturableWindow &window) {
 #ifdef SCREENCAM_HAS_WINDOW_IDS
     const QCapturableWindowPrivate *data = QCapturableWindowPrivate::handle(window);
@@ -57,9 +56,7 @@ QString screenPermissionMessage() {
         "If it keeps asking after every rebuild, run scripts/create-macos-signing-identity.sh once (see README).");
 }
 
-/// Best camera mode for a bubble: the largest resolution up to 1080p that runs at >= 24 fps
-/// (falls back to the largest mode if none is that fast). 4K webcam modes would only cost CPU,
-/// since the camera never fills more than a 1080p-sized area of the video.
+/// The largest mode up to 1080p at >= 24 fps: the bubble never needs more, 4K only costs CPU.
 QCameraFormat pickCameraFormat(const QCameraDevice &device) {
     QCameraFormat best;
     QCameraFormat largest;
@@ -113,8 +110,7 @@ CaptureSources::CaptureSources(QObject *parent)
     m_screenSession.setVideoSink(&m_screenSink);
     m_cameraSession.setVideoSink(&m_cameraSink);
 
-    // Frames may be produced on a media thread; using `this` as context makes Qt deliver
-    // them on the main thread, where the QML previews live.
+    // `this` as context delivers frames on the main thread, where the previews live.
     m_windowSession.setWindowCapture(&m_windowCapture);
     m_windowSession.setVideoSink(&m_windowSink);
     connect(&m_screenSink, &QVideoSink::videoFrameChanged, this, &CaptureSources::onTargetFrame);
@@ -170,7 +166,6 @@ CaptureSources::CaptureSources(QObject *parent)
                 }
             });
 
-    // React to the user's choices.
     RecordingSettings *settings = RecordingSettings::instance();
     connect(settings, &RecordingSettings::screenIdChanged, this, [this] {
         updateScreen();
@@ -240,7 +235,7 @@ void CaptureSources::onTargetFrame(const QVideoFrame &frame) {
             setScreenError(QString());
         }
     }
-    // A window's frames define its size (and it can be resized while open).
+    // A window's frames define its size (it can be resized while open).
     if (m_windowCapture.isActive() && frame.isValid() && frame.size() != m_windowFrameSize) {
         m_windowFrameSize = frame.size();
         emit outputSizeChanged();
@@ -307,7 +302,7 @@ void CaptureSources::updateScreen() {
     m_screenCapture.setActive(wantScreen && !m_useExcludingCapture);
     m_excludingCapture.setActive(wantScreen && m_useExcludingCapture);
     m_windowCapture.setActive(wantWindow);
-    emit targetChanged();  // every choice that changes what's recorded ends up here
+    emit targetChanged();
 }
 
 QVariantList CaptureSources::windows() const {
@@ -323,8 +318,7 @@ void CaptureSources::refreshWindows() {
     const quintptr previousId = hadSelection ? m_windowIds.at(m_selectedWindow) : 0;
     const QString previousLabel = hadSelection ? m_windowLabels.at(m_selectedWindow) : QString();
 
-    // Qt's list = everything the OS calls a window (menu bar, clock, battery ...). Keep the
-    // ones the OS's own list says are real app windows; match the two by native id.
+    // Keep Qt's windows that the OS's list says are app windows, matched by native id.
     bool detailsAvailable = false;
     QHash<quintptr, AppWindow> appWindows;
 #ifdef SCREENCAM_HAS_WINDOW_IDS
@@ -345,11 +339,11 @@ void CaptureSources::refreshWindows() {
         if (detailsAvailable) {
             const auto found = appWindows.constFind(id);
             if (found == appWindows.constEnd()) {
-                continue;  // not an app window
+                continue;
             }
             entries.append({window, id, found->label});
         } else {
-            // Fallback without OS details: at least drop untitled windows and our own.
+            // Without OS details: at least drop untitled windows and our own.
             const QString title = window.description();
             if (title.isEmpty() || title.startsWith(QCoreApplication::applicationName())) {
                 continue;
@@ -357,7 +351,7 @@ void CaptureSources::refreshWindows() {
             entries.append({window, id, title});
         }
     }
-    // Alphabetical, so all of an app's windows sit together ("Safari — A", "Safari — B").
+    // Alphabetical, so an app's windows sit together.
     std::sort(entries.begin(), entries.end(), [](const Entry &a, const Entry &b) {
         return QString::localeAwareCompare(a.label, b.label) < 0;
     });
@@ -426,7 +420,6 @@ QRect CaptureSources::targetBounds() const {
     return {};
 }
 
-// Which capture methods put the pointer into the picture themselves.
 bool CaptureSources::captureIncludesPointer() const {
     if (RecordingSettings::instance()->captureTarget() == RecordingSettings::CaptureTarget::Window) {
 #if defined(Q_OS_WIN)
@@ -445,8 +438,7 @@ bool CaptureSources::captureIncludesPointer() const {
 #endif
 }
 
-// Where the captured picture is on the desktop: the whole screen for screens *and* regions
-// (a region is cropped later, from the full-screen picture), or the window.
+// A region is cropped later from the full-screen picture, so it maps like its screen.
 QRect CaptureSources::pointerTargetBounds() const {
     const RecordingSettings *settings = RecordingSettings::instance();
     if (settings->captureTarget() == RecordingSettings::CaptureTarget::Window) {
@@ -469,7 +461,7 @@ PointerOverlay CaptureSources::pointerOverlay() const {
     overlay.arrow = !captureIncludesPointer();
     overlay.highlight = settings->highlightPointer();
     if (!overlay.arrow && !overlay.highlight) {
-        return overlay;  // nothing to add
+        return overlay;
     }
     const QRect bounds = pointerTargetBounds();
     const QPoint mouse = QCursor::pos();
@@ -497,7 +489,7 @@ void CaptureSources::releaseCamera() {
         return;
     }
     m_cameraSession.setCamera(nullptr);
-    m_camera.reset();  // releases the device: the camera light turns off
+    m_camera.reset();  // the camera light turns off
     m_cameraDeviceId.clear();
     emit cameraActiveChanged();
 }
@@ -507,8 +499,7 @@ void CaptureSources::updateCamera() {
     const bool wanted = !settings->cameraId().isEmpty() && (wantsInputs() || m_bubbleVisible) &&
                         DeviceCatalog::instance()->cameraAllowed();
 
-    // The stand-in camera: the same picture 30 times a second, through the same sink as a
-    // real camera's frames (so previews, resolution and recording all work unchanged).
+    // The stand-in camera goes through the same sink as a real one's frames.
     const bool demo = settings->cameraId() == QLatin1String(DeviceCatalog::kDemoCameraId);
     if (wanted && demo && !m_demoCamera.isActive()) {
         releaseCamera();
@@ -542,7 +533,7 @@ void CaptureSources::updateCamera() {
         return;
     }
     if (m_camera != nullptr && m_cameraDeviceId == settings->cameraId()) {
-        return;  // already running the right camera
+        return;
     }
 
     releaseCamera();
@@ -599,7 +590,6 @@ QRectF CaptureSources::sourceCrop() const {
 
 QSize CaptureSources::outputSize() const {
     const RecordingSettings *settings = RecordingSettings::instance();
-    // The screen's (window's, region's) pixels scaled to the chosen preset, aspect ratio kept.
     const QSize screen = screenSize();
     const core::PixelSize size = core::computeCaptureSize(core::PixelSize{screen.width(), screen.height()},
                                                           static_cast<core::ResolutionPreset>(settings->resolution()));

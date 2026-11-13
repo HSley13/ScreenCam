@@ -7,13 +7,8 @@ namespace screencam::core {
 
 namespace {
 
-// 8.8 fixed-point BT.709 coefficients (value * 256, rounded):
-//   Y =  0.1826 R + 0.6142 G + 0.0620 B + 16
-//   U = -0.1006 R - 0.3386 G + 0.4392 B + 128
-// Each chroma row is rounded so its coefficients sum to exactly 0: then any grey (R = G = B)
-// maps to U = V = 128 — no colour tint on white text or grey UI.
-//   V =  0.4392 R - 0.3989 G - 0.0403 B + 128
-// ">> 8" on a negative int is an arithmetic shift, which C++20 guarantees.
+// 8.8 fixed-point BT.709. Each chroma row's coefficients sum to exactly 0, so greys map to
+// U = V = 128 (no tint on white text).
 inline int lumaOf(int r, int g, int b) {
     return 16 + ((47 * r + 157 * g + 16 * b + 128) >> 8);
 }

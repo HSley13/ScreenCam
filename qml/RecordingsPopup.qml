@@ -5,8 +5,7 @@ import QtQuick.Controls
 import QtQuick.Dialogs
 import QtQuick.Layouts
 
-// "Recordings": everything you've recorded, newest first. A project (a .screencam folder of
-// three files) opens in the editor with one click; a video plays; "Show" finds it on disk.
+// Everything recorded, newest first: projects open in the editor, videos play.
 Popup {
     id: popup
 
@@ -73,7 +72,6 @@ Popup {
 
                 required property var modelData
 
-                // Double-click: the main action (edit a project, play a video).
                 function primaryAction() {
                     if (row.modelData.isProject) {
                         popup.projectChosen(row.modelData.path);
@@ -103,7 +101,6 @@ Popup {
                     anchors.rightMargin: 10
                     spacing: 10
 
-                    // Kind: editable project or finished video.
                     Rectangle {
                         implicitWidth: 34
                         implicitHeight: 34
@@ -159,7 +156,6 @@ Popup {
                         onClicked: row.primaryAction()
                     }
 
-                    // Projects: play the exported video (if any). Videos: play them.
                     StyledButton {
                         visible: !row.modelData.isProject || row.modelData.exportPath.length > 0
                         text: qsTr("Play")
@@ -193,8 +189,7 @@ Popup {
         }
     }
 
-    // A project is a ".screencam" folder. macOS shows it as a single file (see Info.plist), so
-    // pick that; elsewhere it's a normal folder: open it and pick the project.json inside.
+    // macOS shows a .screencam folder as one file (Info.plist); elsewhere pick its project.json.
     FileDialog {
         id: projectDialog
         title: qsTr("Open a ScreenCam project")

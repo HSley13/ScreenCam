@@ -3,10 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 
-// The editor's timeline: one block per segment, a playhead, and time ticks.
-//  - Click or drag anywhere to move the playhead (the segment under it becomes current).
-//  - The current segment is highlighted; a segment with the camera hidden is drawn hatched-dark.
-// It only *displays* positions; seeking is done by whoever handles seekRequested().
+// One block per segment, a playhead and ticks. It only displays; seekRequested() seeks.
 Item {
     id: timeline
 
@@ -23,7 +20,7 @@ Item {
         return ms / timeline.durationMs * track.width;
     }
 
-    // Tick spacing: the smallest "nice" step that keeps labels ~80 px apart.
+    // The smallest "nice" step that keeps labels ~80 px apart.
     readonly property real tickStepMs: {
         const steps = [500, 1000, 2000, 5000, 10000, 15000, 30000, 60000, 120000, 300000, 600000];
         const minimum = timeline.durationMs * 80 / Math.max(1, track.width);
@@ -35,7 +32,6 @@ Item {
         return 1200000;
     }
 
-    // --- Time ticks ---------------------------------------------------------------------
     Item {
         id: ruler
         anchors.left: track.left
@@ -49,7 +45,6 @@ Item {
             delegate: Label {
                 required property int index
                 x: timeline.xFor(index * timeline.tickStepMs) - (index === 0 ? 0 : width / 2)
-                // Tenths only when ticks are closer than a second apart.
                 text: {
                     const label = timeline.editor.formatTime(index * timeline.tickStepMs);
                     return timeline.tickStepMs < 1000 ? label : label.replace(/\.\d$/, "");
@@ -61,7 +56,6 @@ Item {
         }
     }
 
-    // --- Segments -------------------------------------------------------------------------
     Rectangle {
         id: track
         anchors.left: parent.left
@@ -99,7 +93,7 @@ Item {
                     spacing: 6
                     visible: block.width > 46
 
-                    // Tiny icon of the segment's bubble shape (or a dash when hidden).
+                    // The segment's bubble shape, or a dash when hidden.
                     Rectangle {
                         anchors.verticalCenter: parent.verticalCenter
                         width: block.modelData.shape === BubbleStyle.Portrait ? 9 : 14
@@ -122,8 +116,7 @@ Item {
             }
         }
 
-        // Playhead.
-        Rectangle {
+        Rectangle {  // playhead
             x: timeline.xFor(Math.min(timeline.positionMs, timeline.durationMs)) - width / 2
             y: -6
             width: 2
@@ -141,8 +134,7 @@ Item {
         }
     }
 
-    // Covers ruler + track: click/drag anywhere to scrub.
-    MouseArea {
+    MouseArea {  // scrub anywhere
         id: scrubArea
         anchors.fill: parent
         cursorShape: Qt.PointingHandCursor

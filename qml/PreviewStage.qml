@@ -2,8 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtMultimedia
 
-// The big preview on the left: a canvas with the exact aspect ratio of the output video,
-// showing the live screen. (Your camera floats on the desktop; you place it in the editor.)
+// The live screen, at the output video's aspect ratio.
 Rectangle {
     id: stage
 
@@ -20,7 +19,6 @@ Rectangle {
     radius: Theme.radius
     border.color: Theme.stroke
 
-    // --- Header: title + what will be recorded --------------------------------------------
     Row {
         anchors.left: parent.left
         anchors.top: parent.top
@@ -62,7 +60,6 @@ Rectangle {
         }
     }
 
-    // --- Canvas, letter-boxed inside the stage ---------------------------------------------
     Item {
         id: area
         anchors.fill: parent
@@ -82,8 +79,7 @@ Rectangle {
             Behavior on width { NumberAnimation { duration: Theme.animationNormal; easing.type: Easing.OutCubic } }
             Behavior on height { NumberAnimation { duration: Theme.animationNormal; easing.type: Easing.OutCubic } }
 
-            // For a region, the full screen is drawn larger than the canvas and shifted so only
-            // the selected part shows (the canvas clips the rest).
+            // A region: the full screen, enlarged and shifted, clipped by the canvas.
             VideoOutput {
                 id: screenView
                 readonly property rect crop: Capture.sourceCrop
@@ -98,7 +94,7 @@ Rectangle {
                 Component.onDestruction: Capture.removeScreenPreview(videoSink)
             }
 
-            // Shown until frames arrive, or with the reason they don't.
+            // Until frames arrive, or why they don't.
             Column {
                 anchors.centerIn: parent
                 width: parent.width * 0.7

@@ -3,20 +3,16 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 
-// Sidebar section "CAMERA": how your camera bubble looks — the floating bubble while you
-// record, and the starting look in the editor. The editor reuses it for one part's look.
+// "CAMERA": the bubble's look, for the recorder's default or (in the editor) one segment.
 SidebarSection {
     id: section
 
-    // The style being edited: the app-wide default, or the editor's current segment.
     property var bubbleStyle: BubbleStyle
-    // In the editor: titled for the part being edited, shown even without a camera setting.
     property bool editorMode: false
 
     title: editorMode ? qsTr("Camera look") : qsTr("Camera")
     visible: editorMode || RecordingSettings.cameraId.length > 0
 
-    // --- Bubble ----------------------------------------------------------------------
     Field {
         label: qsTr("Shape")
 

@@ -62,10 +62,10 @@ void AudioLevelMeter::restart() {
     if (!device) {
         return;
     }
-    // The device's own preferred format avoids any resampling work just for a meter.
+    // No resampling just for a meter.
     m_source = std::make_unique<QAudioSource>(*device, device->preferredFormat());
     m_source->setBufferSize(4096);
-    m_io = m_source->start();  // "push" mode: we get readyRead whenever samples arrive
+    m_io = m_source->start();  // push mode: readyRead as samples arrive
     if (m_io == nullptr) {
         m_source.reset();
         return;
@@ -85,8 +85,7 @@ void AudioLevelMeter::readSamples() {
         return;
     }
 
-    // Peak = loudest sample in this chunk. normalizedSampleValue() handles every sample
-    // format (8/16/32-bit integer, float) and returns -1..1.
+    // normalizedSampleValue() handles every sample format and returns -1..1.
     double peak = 0.0;
     for (qsizetype offset = 0; offset + bytesPerSample <= data.size(); offset += bytesPerSample) {
         peak = std::max(peak, static_cast<double>(std::abs(format.normalizedSampleValue(data.constData() + offset))));

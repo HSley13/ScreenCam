@@ -19,13 +19,12 @@ bool permissionGranted(const QPermission &permission) {
 }  // namespace
 
 DeviceCatalog *DeviceCatalog::instance() {
-    static DeviceCatalog *catalog = new DeviceCatalog(qApp);  // lives as long as the app
+    static DeviceCatalog *catalog = new DeviceCatalog(qApp);
     return catalog;
 }
 
 DeviceCatalog *DeviceCatalog::create(QQmlEngine *, QJSEngine *) {
     DeviceCatalog *catalog = instance();
-    // The engine must not delete an object it didn't create.
     QJSEngine::setObjectOwnership(catalog, QJSEngine::CppOwnership);
     return catalog;
 }
@@ -91,7 +90,7 @@ QVariantList DeviceCatalog::screens() const {
         QVariantMap map = entry(idOf(screen), label);
         map.insert(QStringLiteral("width"), pixels.width());
         map.insert(QStringLiteral("height"), pixels.height());
-        // Logical (point) geometry on the virtual desktop: where the region selector opens.
+        // Where the region selector opens.
         map.insert(QStringLiteral("geometry"), screen->geometry());
         map.insert(QStringLiteral("pixelRatio"), screen->devicePixelRatio());
         list.append(map);

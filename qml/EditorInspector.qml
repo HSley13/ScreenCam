@@ -4,9 +4,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// The editor's right-hand panel: everything about the segment under the playhead.
-// The bubble controls are the same BubbleSection the recorder uses, pointed at the
-// segment's style instead of the app-wide default.
+// The editor's panel for the segment under the playhead.
 Rectangle {
     id: inspector
 
@@ -62,7 +60,7 @@ Rectangle {
                     StyledButton {
                         Layout.fillWidth: true
                         text: qsTr("Split here (S)")
-                        // segmentCount: re-check after every split/delete (QML can't see inside the call).
+                        // Reads segmentCount so it updates after splits (QML can't see inside the call).
                         enabled: inspector.editor.segmentCount > 0
                                  && inspector.editor.canSplitAt(Math.round(inspector.positionMs))
                         onClicked: inspector.splitRequested()
@@ -143,7 +141,6 @@ Rectangle {
                         return delta === 0 ? qsTr("as recorded") : (delta > 0 ? "+" : "") + delta + " ms";
                     }
 
-                    // If your lips and voice don't line up, nudge the camera later (+) or earlier (−).
                     StyledSlider {
                         Layout.fillWidth: true
                         from: inspector.editor.recordedCameraOffsetMs - 1000

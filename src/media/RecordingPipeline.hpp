@@ -14,16 +14,8 @@
 #include <memory>
 #include <optional>
 
-/// Turns composited frames + microphone audio into an MP4 file.
-///
-///   screen/camera frames ──► FrameCompositor (worker thread) ──NV12 + timestamps──┐
-///                                                                                  ▼
-///   microphone ──► QAudioInput ──► QMediaCaptureSession ◄── QVideoFrameInput ◄─────┘
-///                                         │
-///                                         ▼
-///                                  QMediaRecorder (H.264 + AAC in MP4)
-///
-/// Independent of QML and settings, so tests can drive it with synthetic images.
+/// Frames -> FrameCompositor (worker thread) -> QVideoFrameInput, plus the microphone,
+/// -> QMediaRecorder (H.264 + AAC in MP4). Independent of QML, so tests can drive it.
 class RecordingPipeline : public QObject {
     Q_OBJECT
 
@@ -38,28 +30,26 @@ public:
     explicit RecordingPipeline(QObject *parent = nullptr);
     ~RecordingPipeline() override;
 
-    /// Starts recording; returns false (and emits failed) if the request is unusable.
+    /// False (and failed()) if the request is unusable.
     bool start(const Request &request);
     void pause();
     void resume();
-    /// Stops; finished(path) or failed(message) follows once the file is closed.
+    /// finished() or failed() follows once the file is closed.
     void stop();
 
     bool isActive() const { return m_active; }
     bool isPaused() const { return m_paused; }
     int droppedFrames() const { return m_droppedFrames; }
 
-    // Inputs, forwarded to the compositor thread (call from the main thread).
+    // Call from the main thread.
     void pushScreenFrame(const QVideoFrame &frame);
     void pushCameraFrame(const QVideoFrame &frame);
     void pushScreenImage(const QImage &image);
     void pushCameraImage(const QImage &image);
     void updateBubble(const BubbleStyleSnapshot &bubble);
-    /// Latest mouse pointer (sampled by the caller a few dozen times per second).
     void pushPointer(const PointerOverlay &pointer);
 
 signals:
-    /// Video time 0 on the monotonic clock (see FrameCompositor::clockStarted).
     void clockStarted(qint64 referenceMs);
     void finished(const QString &path);
     void failed(const QString &message);
@@ -77,7 +67,7 @@ private:
     std::unique_ptr<QAudioInput> m_audioInput;
 
     QThread m_thread;
-    FrameCompositor *m_compositor = nullptr;  // lives on m_thread, deleted when it finishes
+    FrameCompositor *m_compositor = nullptr;  // lives on m_thread
 
     QString m_outputPath;
     QString m_error;

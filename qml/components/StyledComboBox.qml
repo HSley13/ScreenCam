@@ -3,18 +3,14 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 
-// Dark ComboBox bound to a setting.
-//  - model:          a JS array of objects, e.g. Devices.cameras
-//  - selectedValue:  the value currently stored in the settings (compared with valueRole)
-//  - picked(value):  emitted when the user chooses something; write it to the settings there.
-// Selecting an item makes ComboBox assign currentIndex itself, which would break our binding;
-// onActivated restores it so later changes from C++ (hot-plug, defaults) still show up.
+// A ComboBox bound to a setting: shows `selectedValue`, emits picked(value). Choosing an item
+// overwrites the currentIndex binding; onActivated restores it so changes from C++ still show.
 ComboBox {
     id: control
 
     property var selectedValue
     signal picked(var value)
-    // Just before the list opens: lets lists that change on their own (open windows) refresh.
+    // For lists that change on their own (open windows).
     signal aboutToOpen()
 
     textRole: "name"

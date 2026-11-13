@@ -49,7 +49,7 @@ RecordingSettings *RecordingSettings::create(QQmlEngine *, QJSEngine *) {
 
 RecordingSettings::RecordingSettings(QObject *parent)
     : QObject(parent) {
-    // First launch: default camera / microphone / primary screen. Afterwards: what was saved.
+    // The system defaults on first launch, then what was saved.
     const QString defaultCamera = DeviceCatalog::idOf(QMediaDevices::defaultVideoInput());
     const QString defaultMicrophone = DeviceCatalog::idOf(QMediaDevices::defaultAudioInput());
 
@@ -58,7 +58,7 @@ RecordingSettings::RecordingSettings(QObject *parent)
     m_region = m_store.value("region", QRect()).toRect();
     m_cameraId = m_store.value("camera", defaultCamera).toString();
     if (m_cameraId.isEmpty()) {
-        m_cameraId = defaultCamera;  // recordings always include you: never start without a camera
+        m_cameraId = defaultCamera;  // never start without a camera
     }
     m_microphoneId = m_store.value("microphone", defaultMicrophone).toString();
     m_resolution = m_store.value("resolution", m_resolution).toInt();

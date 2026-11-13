@@ -13,7 +13,6 @@ class WindowTools : public QObject {
     QML_ELEMENT
     QML_SINGLETON
 
-    /// True where excludeFromCapture() works (macOS, Windows).
     Q_PROPERTY(bool canExcludeFromCapture READ canExcludeFromCapture CONSTANT)
 
 public:
@@ -22,13 +21,8 @@ public:
 
     bool canExcludeFromCapture() const;
 
-    /// Keeps `window` out of screen recordings and screenshots — ScreenCam's own windows
-    /// (control panel, floating camera bubble, mini control bar) never end up in the video,
-    /// and the live preview no longer shows itself in an endless loop.
-    ///  - macOS:   NSWindow.sharingType = NSWindowSharingNone
-    ///  - Windows: SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE)  (Windows 10 2004+)
-    ///  - Linux:   no equivalent; returns false.
-    /// Call it once the window is shown (it needs the native window to exist).
+    /// Keeps `window` out of screen recordings: NSWindowSharingNone on macOS,
+    /// WDA_EXCLUDEFROMCAPTURE on Windows 10 2004+, false on Linux. Call once it's shown.
     Q_INVOKABLE bool excludeFromCapture(QWindow *window);
 
 private:

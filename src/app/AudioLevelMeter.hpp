@@ -8,8 +8,6 @@
 #include <memory>
 
 /// Live input level of one microphone, for the meter under the microphone picker.
-/// Usage in QML:  AudioLevelMeter { deviceId: RecordingSettings.microphoneId; active: true }
-///                ... width: meter.level * track.width
 class AudioLevelMeter : public QObject {
     Q_OBJECT
     QML_ELEMENT
@@ -44,5 +42,5 @@ private:
     double m_level = 0.0;
     std::unique_ptr<QAudioSource> m_source;
     QIODevice *m_io = nullptr;  // owned by m_source
-    QTimer m_decayTimer;        // lets the bar fall when no audio arrives
+    QTimer m_decayTimer;        // the bar falls when no audio arrives
 };

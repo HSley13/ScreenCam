@@ -20,8 +20,7 @@
 namespace core = screencam::core;
 
 namespace {
-// How long to wait after minimizing the window before the first frame, so the
-// minimize animation doesn't end up at the start of the video.
+// Keeps the minimize animation out of the start of the video.
 constexpr int kHideDelayMs = 450;
 }  // namespace
 
@@ -48,8 +47,7 @@ RecordingController::RecordingController(QObject *parent)
         }
     });
 
-    // The mouse moves even when nothing else on screen changes (and some captures only
-    // deliver a picture on change), so it is sampled on its own clock, not per screen frame.
+    // Sampled on its own clock: some captures only deliver a picture when the screen changes.
     m_pointerTicker.setInterval(16);
     connect(&m_pointerTicker, &QTimer::timeout, this, [this] {
         if (m_pipeline.isActive() && !m_pipeline.isPaused()) {
@@ -60,7 +58,6 @@ RecordingController::RecordingController(QObject *parent)
     m_elapsedTicker.setInterval(250);
     connect(&m_elapsedTicker, &QTimer::timeout, this, &RecordingController::elapsedChanged);
 
-    // Live inputs -> pipelines (only while they record).
     CaptureSources *capture = CaptureSources::instance();
     connect(capture, &CaptureSources::screenFrameArrived, this, [this](const QVideoFrame &frame) {
         if (m_pipeline.isActive()) {
@@ -69,7 +66,7 @@ RecordingController::RecordingController(QObject *parent)
     });
     connect(capture, &CaptureSources::cameraFrameArrived, this, [this](const QVideoFrame &frame) {
         if (m_cameraPipeline.isActive()) {
-            m_cameraPipeline.pushCameraFrame(frame);  // camera.mp4, next to screen.mp4
+            m_cameraPipeline.pushCameraFrame(frame);
         }
     });
 
@@ -115,7 +112,7 @@ QString RecordingController::validate() const {
     if (!capture->screenError().isEmpty()) {
         return capture->screenError();
     }
-    // Every recording is screen + you: without a working camera there's nothing to make.
+    // Every recording is screen + you.
     if (!DeviceCatalog::instance()->cameraAllowed()) {
         return tr("ScreenCam isn't allowed to use the camera. Allow it in your system's privacy settings.");
     }
@@ -145,9 +142,7 @@ void RecordingController::start() {
         return;
     }
 
-    // Keep the camera/screen running even when the window gets minimized.
-    CaptureSources::instance()->setRecordingActive(true);
-    // Get out of the way right away: the countdown runs in the floating mini control bar.
+    CaptureSources::instance()->setRecordingActive(true);  // also while minimized
     if (RecordingSettings::instance()->hideWindowWhileRecording()) {
         emit windowHideRequested();
     }
@@ -184,8 +179,6 @@ void RecordingController::startPipelines() {
         return core::planEncoder(core::PixelSize{size.width(), size.height()}, fps).averageBitRate;
     };
 
-    // Every recording is an editable project: the screen and the camera in two separate files,
-    // so you can still move yourself around afterwards.
     RecordingPipeline::Request request;
     request.compositor.canvasSize = capture->outputSize();
     request.compositor.sourceCrop = capture->sourceCrop();
@@ -230,11 +223,11 @@ void RecordingController::startPipelines() {
     if (screenStarted) {
         m_pendingPipelines++;
         if (capture->lastScreenFrame().isValid()) {
-            m_pipeline.pushScreenFrame(capture->lastScreenFrame());  // what's on screen right now
+            m_pipeline.pushScreenFrame(capture->lastScreenFrame());
         }
     }
     if (screenStarted) {
-        // The camera's full frame, unmirrored: mirroring and cropping happen at export time.
+        // Full frame, unmirrored: mirroring and cropping happen at export.
         const QSize camera = capture->cameraResolution();
         RecordingPipeline::Request cameraRequest;
         cameraRequest.compositor.canvasSize = QSize(core::makeEven(camera.width()), core::makeEven(camera.height()));
@@ -262,7 +255,7 @@ void RecordingController::startPipelines() {
 
 void RecordingController::onPipelineDone(bool camera, const QString &error) {
     if (m_startingPipelines || m_state == State::Idle) {
-        return;  // a request was rejected inside start(): handled by startPipelines()
+        return;  // rejected inside start(): startPipelines() handles it
     }
     if (!error.isEmpty()) {
         setError(error);
@@ -281,9 +274,9 @@ void RecordingController::onPipelineDone(bool camera, const QString &error) {
 
     completeProject();
     const bool saved = m_lastRecording == m_project.folder && !m_project.folder.isEmpty();
-    finish();  // brings the recorder window back...
+    finish();  // the recorder window comes back first, so the editor opens on top
     if (saved) {
-        emit openProjectRequested(m_project.folder);  // ...then the editor opens on top of it
+        emit openProjectRequested(m_project.folder);
     }
 }
 
@@ -322,7 +315,7 @@ void RecordingController::stop() {
         m_elapsedTicker.stop();
         setState(State::Finalizing);
         m_pipeline.stop();
-        m_cameraPipeline.stop();  // no-op unless recording a project
+        m_cameraPipeline.stop();
         break;
     case State::Idle:
     case State::Finalizing:
@@ -381,9 +374,9 @@ void RecordingController::openLastRecording() {
         return;
     }
     if (QFileInfo(m_lastRecording).isDir()) {
-        emit openProjectRequested(m_lastRecording);  // a project: open it in the editor
+        emit openProjectRequested(m_lastRecording);
     } else {
-        QDesktopServices::openUrl(QUrl::fromLocalFile(m_lastRecording));  // a finished video: play it
+        QDesktopServices::openUrl(QUrl::fromLocalFile(m_lastRecording));
     }
 }
 
@@ -416,7 +409,7 @@ void RecordingController::clearError() {
 void RecordingController::setState(State state) {
     if (m_state != state) {
         m_state = state;
-        // Sample the pointer only while a recording is running (no wake-ups when idle).
+        // No wake-ups when idle.
         if (m_state == State::Recording || m_state == State::Paused) {
             m_pointerTicker.start();
         } else {

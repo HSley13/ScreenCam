@@ -1,7 +1,5 @@
 #pragma once
 
-// Pure C++ (no Apple headers): everything here can be unit-tested on any OS.
-
 #include <array>
 #include <string_view>
 
@@ -15,8 +13,7 @@ struct PixelSize {
     friend constexpr bool operator==(const PixelSize&, const PixelSize&) = default;
 };
 
-/// Resolutions the user can pick for the screen recording.
-/// The number is the output *height*; the width follows the display's aspect ratio.
+/// The number is the output height; the width follows the display's aspect ratio.
 enum class ResolutionPreset {
     HD720,
     FullHD1080,
@@ -31,17 +28,13 @@ struct ResolutionOption {
     int targetHeight;  // 0 means "use the display's native height"
 };
 
-/// Every preset, in the order the UI should list them.
+/// In the order the UI lists them.
 const std::array<ResolutionOption, 5>& resolutionOptions();
 
-/// Rounds down to an even number (minimum 2).
-/// H.264/HEVC store colour at half resolution (4:2:0), so both dimensions must be even.
+/// Rounds down to an even number (minimum 2): 4:2:0 video needs even dimensions.
 int makeEven(int value);
 
-/// Output size of the screen recording for a display of `displayPixels`:
-///  - keeps the display's aspect ratio (no black bars, no stretching),
-///  - never upscales (asking for 4K on a 1080p display gives 1080p),
-///  - always returns even dimensions, or {0, 0} for an invalid display size.
+/// Keeps the display's aspect ratio, never upscales, returns even sizes ({0, 0} if invalid).
 PixelSize computeCaptureSize(PixelSize displayPixels, ResolutionPreset preset);
 
 }  // namespace screencam::core

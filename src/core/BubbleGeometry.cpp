@@ -10,7 +10,7 @@ namespace {
 
 constexpr double kMinSizeFraction = 0.08;
 constexpr double kMaxSizeFraction = 0.6;
-constexpr double kRectangleBoost = 1.25;  // rectangles get a longer long side, see header
+constexpr double kRectangleBoost = 1.25;
 constexpr double kMarginFraction = 0.03;
 
 double shortSide(SizeD size) {

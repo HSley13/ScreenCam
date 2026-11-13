@@ -2,11 +2,9 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// Bottom bar: record/stop button, status + timer, pause/stop or "play last recording".
 Rectangle {
     id: bar
 
-    // Emitted with the chosen .screencam folder.
     signal projectChosen(string folder)
 
     readonly property bool recording: Recorder.state === Recorder.Recording
@@ -39,7 +37,6 @@ Rectangle {
             RowLayout {
                 spacing: 8
 
-                // Blinking dot while recording.
                 Rectangle {
                     visible: bar.live
                     implicitWidth: 9
@@ -73,7 +70,7 @@ Rectangle {
                     color: Theme.text
                     font.pixelSize: bar.live ? 20 : 16
                     font.weight: Font.DemiBold
-                    font.features: { "tnum": 1 }  // tabular digits: the timer doesn't jiggle
+                    font.features: { "tnum": 1 }  // the timer doesn't jiggle
                 }
             }
 
@@ -116,7 +113,6 @@ Rectangle {
             onClicked: Recorder.openLastRecording()
         }
 
-        // Every recording so far: reopen a project in the editor, play a video.
         StyledButton {
             id: recordingsButton
             visible: Recorder.state === Recorder.Idle
@@ -127,7 +123,6 @@ Rectangle {
 
     RecordingsPopup {
         id: recordings
-        // Opens upwards, right-aligned with the bar.
         x: bar.width - width
         y: -height - 10
         onProjectChosen: (location) => bar.projectChosen(location)

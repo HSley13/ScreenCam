@@ -1,7 +1,6 @@
 pragma Singleton
 import QtQuick
 
-// One place for every colour, radius and spacing used by the UI.
 QtObject {
     readonly property color window: "#0d0f14"
     readonly property color surface: "#151821"

@@ -22,9 +22,7 @@ QHash<quintptr, AppWindow> listAppWindows(bool *supported) {
     }
     QHash<quintptr, AppWindow> result;
     @autoreleasepool {
-        // On-screen windows only (that's also what Qt lists and what can be captured: a
-        // minimized window or one on another Space has no pixels to record), without the
-        // desktop picture and desktop icons.
+        // On-screen only: a minimized window or one on another Space has nothing to record.
         CFArrayRef list = CGWindowListCopyWindowInfo(
             kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements, kCGNullWindowID);
         if (list == nullptr) {
@@ -35,8 +33,6 @@ QHash<quintptr, AppWindow> listAppWindows(bool *supported) {
 
         for (NSDictionary *info in windows) {
             screencam::core::WindowTraits traits;
-            // Level 0 = normal windows. Menu bar (24), status items (25), Dock (20),
-            // pop-up menus (101), screen savers ... are all above it.
             traits.layer = [value(info, kCGWindowLayer) intValue];
             NSNumber *alpha = value(info, kCGWindowAlpha);
             traits.alpha = alpha != nil ? alpha.doubleValue : 1.0;
@@ -51,14 +47,11 @@ QHash<quintptr, AppWindow> listAppWindows(bool *supported) {
 
             const pid_t pid = [value(info, kCGWindowOwnerPID) intValue];
             traits.ownedBySelf = pid == ownPid;
-            // "Regular" apps are the ones with a Dock icon and a menu bar. Menu-bar utilities
-            // (CPU/battery meters, clipboard managers) are "accessory" apps, and system parts
-            // (Control Center, Notification Center, Spotlight) are background agents — their
-            // pop-overs can be big, level-0 windows, so the level alone isn't enough.
+            // Menu-bar utilities and system parts (Control Center, Spotlight) aren't "regular"
+            // apps; their pop-overs can be big level-0 windows, so the level isn't enough.
             NSRunningApplication *app = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
             traits.regularApp = app != nil && app.activationPolicy == NSApplicationActivationPolicyRegular;
-            // Every level-0 window of a regular app has the standard window buttons; macOS
-            // doesn't report them separately, so hasWindowControls keeps its default (true).
+            // macOS doesn't report window buttons: hasWindowControls stays true.
 
             if (!screencam::core::isUserAppWindow(traits)) {
                 continue;
@@ -71,8 +64,7 @@ QHash<quintptr, AppWindow> listAppWindows(bool *supported) {
                 appName = value(info, kCGWindowOwnerName);
             }
             window.appName = QString::fromNSString(appName);
-            // Titles are only visible once Screen Recording is allowed; until then, the
-            // label is just the app name.
+            // Empty until Screen Recording is allowed.
             window.title = QString::fromNSString(value(info, kCGWindowName));
             window.label = QString::fromStdString(
                 screencam::core::windowLabel(window.appName.toStdString(), window.title.toStdString()));
@@ -86,7 +78,7 @@ QHash<quintptr, AppWindow> listAppWindows(bool *supported) {
 QRect appWindowBounds(quintptr id) {
     QRect bounds;
     @autoreleasepool {
-        // The API takes an array of window ids stored *as pointer values*.
+        // The API takes window ids stored as pointer values.
         const void *windowId = reinterpret_cast<const void *>(static_cast<uintptr_t>(id));
         CFArrayRef ids = CFArrayCreate(nullptr, &windowId, 1, nullptr);
         CFArrayRef list = CGWindowListCreateDescriptionFromArray(ids);

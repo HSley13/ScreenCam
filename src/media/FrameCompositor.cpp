@@ -21,8 +21,7 @@ const QColor kCanvasBackground(7, 8, 11);
 const QColor kCameraPlaceholder(29, 33, 48);
 constexpr int kShadowAlpha = 140;
 
-/// One horizontal + one vertical box-blur pass over the alpha channel of a black,
-/// premultiplied image. Repeating it twice approximates a Gaussian blur closely.
+/// Box blur of the alpha channel; two passes approximate a Gaussian.
 void boxBlurAlpha(QImage &image, int radius) {
     const int width = image.width();
     const int height = image.height();
@@ -73,7 +72,7 @@ FrameCompositor::FrameCompositor(QObject *parent)
 void FrameCompositor::configure(const CompositorConfig &config) {
     m_config = config;
     m_config.framesPerSecond = std::clamp(config.framesPerSecond, 1, 120);
-    m_shadowKeyRadius = -1.0;  // force a new shadow and mask
+    m_shadowKeyRadius = -1.0;  // rebuild shadow and mask
     m_maskKeyRadius = -1.0;
 }
 
@@ -102,8 +101,7 @@ void FrameCompositor::setCameraImage(const QImage &image) {
 }
 
 void FrameCompositor::refreshImages() {
-    // A camera at 30 fps and a 60 Hz screen would otherwise cost a conversion per frame
-    // even when we only record 24 fps: convert lazily, only what a tick actually uses.
+    // Convert lazily: a 60 Hz screen would otherwise cost a conversion per frame.
     if (m_screenDirty) {
         m_screenImage = m_screenFrame.toImage();
         m_screenDirty = false;
@@ -141,10 +139,8 @@ QImage FrameCompositor::renderCanvas() {
 }
 
 QRectF FrameCompositor::screenTargetRect(const QRectF &canvas, QRectF *crop) const {
-    // 1) The part of the frame to record (all of it, or the selected region).
     *crop = m_config.sourceCrop.isValid() ? m_config.sourceCrop : QRectF(0.0, 0.0, 1.0, 1.0);
-    // 2) Fit it into the canvas. Screens and regions already have the canvas's aspect ratio, so
-    //    this fills it; a window resized mid-recording gets black bars instead of being stretched.
+    // Screens and regions fill the canvas; a window resized mid-recording gets black bars.
     const core::RectD fit = core::aspectFitRect(
         core::SizeD{crop->width() * m_screenImage.width(), crop->height() * m_screenImage.height()},
         core::SizeD{canvas.width(), canvas.height()});
@@ -166,7 +162,6 @@ void FrameCompositor::drawPointer(QPainter &painter, const QRectF &canvas) const
     if (!m_pointer.visible || m_screenImage.isNull()) {
         return;
     }
-    // Same mapping as the screen picture: frame position -> crop -> fitted canvas rectangle.
     QRectF crop;
     const QRectF target = screenTargetRect(canvas, &crop);
     if (crop.width() <= 0.0 || crop.height() <= 0.0) {
@@ -175,15 +170,15 @@ void FrameCompositor::drawPointer(QPainter &painter, const QRectF &canvas) const
     const QPointF tip(target.x() + (m_pointer.tip.x() - crop.x()) / crop.width() * target.width(),
                       target.y() + (m_pointer.tip.y() - crop.y()) / crop.height() * target.height());
     if (!target.contains(tip)) {
-        return;  // the mouse is outside the recorded region
+        return;  // outside the recorded region
     }
     const double height = m_pointer.height / crop.height() * target.height();
 
     painter.save();
-    painter.setClipRect(target);  // nothing spills outside the recorded picture
+    painter.setClipRect(target);
     if (m_pointer.highlight) {
         painter.setPen(Qt::NoPen);
-        painter.setBrush(QColor(255, 214, 10, 95));  // translucent yellow
+        painter.setBrush(QColor(255, 214, 10, 95));
         painter.drawEllipse(tip, height * 1.1, height * 1.1);
     }
     // The classic arrow, in units of its height: tip at (0, 0), pointing up-left.
@@ -207,7 +202,6 @@ void FrameCompositor::drawCamera(QPainter &painter, const QRectF &target, bool m
     if (m_cameraImage.isNull() || target.isEmpty()) {
         return;
     }
-    // Crop the middle of the camera image to the target's aspect ratio (no stretching).
     const core::RectD crop =
         core::aspectFillCrop(core::SizeD{static_cast<double>(m_cameraImage.width()),
                                          static_cast<double>(m_cameraImage.height())},
@@ -216,7 +210,6 @@ void FrameCompositor::drawCamera(QPainter &painter, const QRectF &target, bool m
 
     painter.save();
     if (mirrored) {
-        // Flip horizontally around the target's vertical centre line.
         painter.translate(target.center().x(), 0.0);
         painter.scale(-1.0, 1.0);
         painter.translate(-target.center().x(), 0.0);
@@ -230,7 +223,6 @@ void FrameCompositor::drawBubble(QPainter &painter) {
     const double canvasWidth = m_config.canvasSize.width();
     const double canvasHeight = m_config.canvasSize.height();
 
-    // Same geometry the QML preview uses.
     const core::RectD r =
         core::bubbleRect(core::SizeD{canvasWidth, canvasHeight}, style.shape, style.size, style.center);
     const QRect rect(qRound(r.x), qRound(r.y), qRound(r.width), qRound(r.height));
@@ -241,15 +233,13 @@ void FrameCompositor::drawBubble(QPainter &painter) {
         style.shape, core::SizeD{static_cast<double>(rect.width()), static_cast<double>(rect.height())},
         style.roundness);
 
-    // 1) Shadow, slightly below the bubble.
     if (style.shadow) {
         const QImage &shadow = shadowFor(rect.size(), radius);
         const int offset = std::max(2, qRound(rect.height() * 0.03));
         painter.drawImage(rect.topLeft() + QPoint(-m_shadowPadding, -m_shadowPadding + offset), shadow);
     }
 
-    // 2) Camera, clipped to the shape with an *anti-aliased* alpha mask. (QPainter's clip
-    //    paths are not anti-aliased, which would give the circle jagged edges.)
+    // Clipped with an alpha mask: QPainter's clip paths aren't anti-aliased (jagged circle).
     QImage bubble(rect.size(), QImage::Format_ARGB32_Premultiplied);
     bubble.fill(Qt::transparent);
     {
@@ -260,13 +250,12 @@ void FrameCompositor::drawBubble(QPainter &painter) {
         bp.fillRect(local, kCameraPlaceholder);
         drawCamera(bp, local, style.mirrored);
 
-        // DestinationIn keeps each pixel's colour scaled by the mask's alpha. It only affects
-        // pixels the mask *covers*, so the mask must be a full-size image (transparent outside
-        // the shape), not just the shape's path — otherwise the corners would survive.
+        // DestinationIn only affects pixels the mask covers, so the mask is a full-size image
+        // (transparent outside the shape), not a path: otherwise the corners would survive.
         bp.setCompositionMode(QPainter::CompositionMode_DestinationIn);
         bp.drawImage(0, 0, maskFor(rect.size(), radius));
 
-        // 3) Border, drawn inside the shape (like a QML Rectangle border).
+        // Border inside the shape, like a QML Rectangle's.
         const double border = style.borderPixels(canvasWidth, canvasHeight);
         if (border >= 0.5) {
             bp.setCompositionMode(QPainter::CompositionMode_SourceOver);
@@ -290,7 +279,7 @@ const QImage &FrameCompositor::maskFor(const QSize &bubbleSize, double radius) {
     m_mask.fill(Qt::transparent);
     {
         QPainter p(&m_mask);
-        p.setRenderHint(QPainter::Antialiasing);  // soft 1-px edge instead of jagged steps
+        p.setRenderHint(QPainter::Antialiasing);
         QPainterPath shape;
         shape.addRoundedRect(QRectF(QPointF(0.0, 0.0), QSizeF(bubbleSize)), radius, radius);
         p.fillPath(shape, Qt::black);
@@ -356,7 +345,7 @@ void FrameCompositor::start() {
     m_lastTimestampUs = -1;
     m_running = true;
     m_timer->start(std::max(1, 1000 / m_config.framesPerSecond));
-    tick();  // first frame right away
+    tick();
 }
 
 void FrameCompositor::pause() {
@@ -402,8 +391,7 @@ void FrameCompositor::tick() {
     if (timestamp <= m_lastTimestampUs) {
         return;  // timestamps must strictly increase
     }
-    // No picture yet (the first screen/camera frame is still on its way): write nothing rather
-    // than a black frame, so a recording never starts with a blank flash.
+    // Until the first frame arrives write nothing, so a recording never starts with a black flash.
     refreshImages();
     const bool hasPicture = m_config.layout == CompositeLayout::CameraOnly ? !m_cameraImage.isNull()
                                                                            : !m_screenImage.isNull();

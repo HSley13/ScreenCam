@@ -5,13 +5,8 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtMultimedia
 
-// The editor: plays a recorded project and lets you move the camera bubble over time.
-//
-// Two players run side by side, like two tracks in a video editor:
-//   screenPlayer — screen.mp4 with the microphone audio: the *master* clock
-//   cameraPlayer — camera.mp4 (no audio), drawn inside the bubble
-// The camera file started `cameraOffsetMs` later than the screen, so at video time t the
-// camera must be at t - cameraOffsetMs. syncCamera() keeps it there.
+// Plays a project and lets you move the camera bubble over time. screenPlayer (with the
+// audio) is the master clock; syncCamera() keeps cameraPlayer at t - cameraOffsetMs.
 Item {
     id: page
 
@@ -20,11 +15,9 @@ Item {
     signal closeRequested()
 
     readonly property bool playing: screenPlayer.playbackState === MediaPlayer.PlayingState
-    // Where the playhead is drawn. While scrubbing, the requested time (the player only
-    // reports positions once it has decoded the frame, which lags behind the mouse).
+    // While scrubbing, the requested time: the player's position lags behind the mouse.
     property real playheadMs: 0
 
-    // File name of the export that just finished, for the status line.
     property string exportedName: ""
 
     ProjectEditor {
@@ -35,7 +28,6 @@ Item {
     Component.onCompleted: project.open(page.folder)
     Component.onDestruction: project.close()
 
-    // --- Playback ---------------------------------------------------------------------------
     function seek(ms: real) {
         const target = Math.max(0, Math.min(ms, project.durationMs));
         page.playheadMs = target;
@@ -49,7 +41,7 @@ Item {
             screenPlayer.pause();
         } else {
             if (screenPlayer.position >= project.durationMs - 50) {
-                page.seek(0);  // at the end: play from the start again
+                page.seek(0);  // at the end: from the start
             }
             screenPlayer.play();
         }
@@ -59,15 +51,12 @@ Item {
         project.splitAt(Math.round(page.playheadMs));
     }
 
-    // Puts the camera player where the screen player is (or will be, for `timeMs`).
-    //  force: jump even if it's close (after a seek); otherwise only correct real drift,
-    //         because every seek makes the decoder stutter.
+    // Without `force` only real drift is corrected: every seek makes the decoder stutter.
     function syncCamera(timeMs: real, force: bool) {
         if (!project.hasCamera) {
             return;
         }
         const target = timeMs - project.cameraOffsetMs;
-        // Before the camera's first frame or after its last: hold it still.
         if (target < 0 || (cameraPlayer.duration > 0 && target > cameraPlayer.duration)) {
             if (cameraPlayer.playbackState === MediaPlayer.PlayingState) {
                 cameraPlayer.pause();
@@ -95,12 +84,12 @@ Item {
 
         property bool prepared: false
 
-        // A freshly loaded player shows nothing; pausing it once decodes and shows the first
-        // frame. Only once: seeking re-enters LoadedMedia, and pausing there again would loop.
+        // Pausing a freshly loaded player shows its first frame. Only once: seeking re-enters
+        // LoadedMedia, and pausing again would loop.
         onMediaStatusChanged: {
             if (mediaStatus === MediaPlayer.LoadedMedia && !prepared) {
                 prepared = true;
-                project.durationMs = duration;  // the file knows its real length
+                project.durationMs = duration;
                 pause();
             } else if (mediaStatus === MediaPlayer.EndOfMedia) {
                 page.playheadMs = project.durationMs;
@@ -109,7 +98,7 @@ Item {
         onPositionChanged: {
             if (!timeline.scrubbing) {
                 page.playheadMs = position;
-                project.selectAt(position);  // the bubble follows the segment being played
+                project.selectAt(position);
             }
         }
         onPlaybackStateChanged: {
@@ -135,7 +124,7 @@ Item {
         }
     }
 
-    // Drift check while playing: two decoders never stay perfectly in step.
+    // Two decoders never stay perfectly in step.
     Timer {
         interval: 500
         repeat: true
@@ -151,7 +140,6 @@ Item {
         }
     }
 
-    // --- Keyboard -------------------------------------------------------------------------
     Shortcut {
         sequences: ["Space"]
         onActivated: page.togglePlay()
@@ -182,12 +170,10 @@ Item {
         onActivated: page.seek(0)
     }
 
-    // --- Layout -------------------------------------------------------------------------------
     ColumnLayout {
         anchors.fill: parent
         spacing: 12
 
-        // Header: back, project name, save state.
         RowLayout {
             Layout.fillWidth: true
             spacing: 12
@@ -237,7 +223,7 @@ Item {
                 onClicked: project.playLastExport()
             }
 
-            // Export progress: bar + percentage + cancel, in place of the export button.
+            // In place of the export button.
             RowLayout {
                 visible: project.exporting
                 spacing: 10
@@ -293,7 +279,6 @@ Item {
                 Layout.fillHeight: true
                 spacing: 12
 
-                // Preview: the output canvas, letterboxed into the available space.
                 Rectangle {
                     id: stage
                     Layout.fillWidth: true
@@ -326,8 +311,7 @@ Item {
                             fillMode: VideoOutput.PreserveAspectFit
                         }
 
-                        // Same component (and same C++ geometry) as the recorder's bubble, so
-                        // what you place here is exactly what the export draws.
+                        // Same component and C++ geometry as the export.
                         CameraBubble {
                             id: bubble
                             canvasSize: Qt.size(canvas.width, canvas.height)
@@ -337,7 +321,7 @@ Item {
                             visible: project.hasCamera && project.cameraVisible
                         }
 
-                        // Click the picture to play/pause (the bubble's own handlers win over this).
+                        // Play/pause (the bubble's own handlers win).
                         TapHandler {
                             onTapped: page.togglePlay()
                         }
@@ -354,7 +338,6 @@ Item {
                     }
                 }
 
-                // Transport + timeline.
                 Rectangle {
                     Layout.fillWidth: true
                     implicitHeight: transport.implicitHeight + 28
@@ -372,7 +355,6 @@ Item {
                             Layout.fillWidth: true
                             spacing: 12
 
-                            // Play/pause: round accent button with a drawn icon.
                             Rectangle {
                                 implicitWidth: 40
                                 implicitHeight: 40
@@ -380,7 +362,6 @@ Item {
                                 color: playArea.pressed ? Qt.darker(Theme.accent, 1.2)
                                                         : playArea.containsMouse ? Qt.lighter(Theme.accent, 1.1) : Theme.accent
 
-                                // Pause bars.
                                 Row {
                                     anchors.centerIn: parent
                                     spacing: 4
@@ -390,7 +371,6 @@ Item {
                                     Rectangle { width: 4; height: 14; radius: 1; color: "white" }
                                 }
 
-                                // Play triangle.
                                 Canvas {
                                     anchors.centerIn: parent
                                     anchors.horizontalCenterOffset: 2

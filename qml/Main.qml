@@ -16,18 +16,13 @@ ApplicationWindow {
     title: qsTr("ScreenCam")
     color: Theme.window
 
-    // Set from the command line (`ScreenCam --open My.screencam`) or a Finder double-click,
-    // see main.cpp.
-    property string initialProject: ""
-    // Open editor windows, by project folder: opening the same project again just brings its
-    // window to the front. (Also keeps them referenced, so they aren't garbage-collected.)
+    property string initialProject: ""  // `--open`, or a Finder double-click
+    // By project folder; also keeps them from being garbage-collected.
     property var editorWindows: ({})
-    // The editor window you're working in, if any. While it's active the live camera and
-    // screen are paused (camera light off) and the floating bubble steps aside.
+    // While an editor is active the live inputs pause and the floating bubble steps aside.
     property Window activeEditor: null
     readonly property bool editing: activeEditor !== null
 
-    // macOS asks for camera/microphone access the first time; elsewhere this is a no-op.
     Component.onCompleted: {
         Devices.requestPermissions();
         if (initialProject.length > 0) {
@@ -71,8 +66,7 @@ ApplicationWindow {
         EditorWindow {}
     }
 
-    // Closing the recorder window quits ScreenCam (open editors save as they close). Not in
-    // the middle of a recording, though: then it just steps aside.
+    // Closing the recorder quits ScreenCam (editors save as they close), except mid-recording.
     onClosing: (close) => {
         if (Recorder.busy) {
             close.accepted = false;
@@ -81,8 +75,7 @@ ApplicationWindow {
         }
         Qt.quit();
     }
-    // Never record ScreenCam's own window (this also stops the preview from showing itself
-    // in an endless loop). Re-applied whenever the window is shown again.
+    // Re-applied whenever the window is shown again.
     onVisibilityChanged: (visibility) => {
         if (visibility !== Window.Hidden) {
             WindowTools.excludeFromCapture(window);
@@ -96,7 +89,6 @@ ApplicationWindow {
         value: window.visible && window.visibility !== Window.Minimized && !window.editing
     }
 
-    // --- Recorder -----------------------------------------------------------------------------
     RowLayout {
         anchors.fill: parent
         anchors.margins: 16
@@ -136,12 +128,9 @@ ApplicationWindow {
         anchors.fill: parent
     }
 
-    // The name of the screen, window or region being recorded, shown on it.
     TargetTag {}
 
-    // Your camera, floating on the desktop, with the recording controls attached while
-    // recording. (It steps aside while you work in an editor window — never mid-recording:
-    // it carries the Stop button.)
+    // Steps aside for an editor, but never mid-recording: it carries the Stop button.
     FloatingBubble {
         visible: RecordingSettings.cameraId.length > 0 && Devices.cameraAllowed
                  && (Recorder.busy || !window.editing)
@@ -153,7 +142,6 @@ ApplicationWindow {
         window.requestActivate();
     }
 
-    // The recorder asks the window to step aside while recording, and to come back after.
     Connections {
         target: Recorder
 
@@ -165,13 +153,12 @@ ApplicationWindow {
             window.bringToFront();
         }
 
-        // A project recording finished (or "Edit recording" was clicked): edit it.
         function onOpenProjectRequested(folder) {
             window.openEditor(folder);
         }
     }
 
-    // ⌘⇧R / Ctrl+Shift+R start/stop, ⌘⇧P / Ctrl+Shift+P pause ("Ctrl" means ⌘ on macOS).
+    // "Ctrl" is ⌘ on macOS.
     Shortcut {
         sequences: ["Ctrl+Shift+R"]
         context: Qt.ApplicationShortcut
@@ -191,7 +178,6 @@ ApplicationWindow {
         onActivated: Recorder.cancelCountdown()
     }
 
-    // Menu-bar / system-tray controls while the window is hidden.
     Platform.SystemTrayIcon {
         visible: Recorder.busy
         icon.source: Recorder.state === Recorder.Paused ? "icons/tray-paused.png" : "icons/tray-recording.png"
