@@ -74,7 +74,7 @@ public:
     bool screenActive() const {
         return m_screenCapture.isActive() || m_excludingCapture.isActive() || m_windowCapture.isActive();
     }
-    bool cameraActive() const { return m_camera != nullptr && m_camera->isActive(); }
+    bool cameraActive() const { return (m_camera != nullptr && m_camera->isActive()) || m_demoCamera.isActive(); }
     QString screenError() const { return m_screenError; }
     QString cameraError() const { return m_cameraError; }
     QString backendProblem() const { return m_backendProblem; }
@@ -169,6 +169,7 @@ private:
     QList<QPointer<QVideoSink>> m_cameraPreviews;
     QString m_cameraError;
     QSize m_cameraResolution;
+    QTimer m_demoCamera;  // feeds DeviceCatalog::demoCameraImage() instead of a real camera
 
     QString m_backendProblem;
     bool m_previewEnabled = false;

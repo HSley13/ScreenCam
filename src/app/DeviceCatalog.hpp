@@ -38,6 +38,11 @@ public:
     static DeviceCatalog *create(QQmlEngine *qmlEngine, QJSEngine *jsEngine);
 
     QVariantList cameras() const;
+
+    /// A stand-in camera that shows a still picture: set SCREENCAM_DEMO_CAMERA=<image file>.
+    /// For machines without a webcam — the README screenshots were made with it.
+    static QString demoCameraImage();
+    static constexpr const char *kDemoCameraId = "demo";
     QVariantList microphones() const;
     QVariantList screens() const;
     bool cameraAllowed() const;

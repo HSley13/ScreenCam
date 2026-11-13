@@ -60,7 +60,14 @@ QVariantList DeviceCatalog::cameras() const {
     for (const QCameraDevice &device : QMediaDevices::videoInputs()) {
         list.append(entry(idOf(device), device.description()));
     }
+    if (!demoCameraImage().isEmpty()) {
+        list.append(entry(QString::fromLatin1(kDemoCameraId), tr("Demo camera")));
+    }
     return list;
+}
+
+QString DeviceCatalog::demoCameraImage() {
+    return qEnvironmentVariable("SCREENCAM_DEMO_CAMERA");
 }
 
 QVariantList DeviceCatalog::microphones() const {
@@ -93,7 +100,7 @@ QVariantList DeviceCatalog::screens() const {
 }
 
 bool DeviceCatalog::cameraAllowed() const {
-    return permissionGranted(QCameraPermission{});
+    return !demoCameraImage().isEmpty() || permissionGranted(QCameraPermission{});
 }
 
 bool DeviceCatalog::microphoneAllowed() const {

@@ -501,6 +501,32 @@ void CaptureSources::updateCamera() {
     const RecordingSettings *settings = RecordingSettings::instance();
     const bool wanted = !settings->cameraId().isEmpty() && (wantsInputs() || m_bubbleVisible) &&
                         DeviceCatalog::instance()->cameraAllowed();
+
+    // The stand-in camera: the same picture 30 times a second, through the same sink as a
+    // real camera's frames (so previews, resolution and recording all work unchanged).
+    const bool demo = settings->cameraId() == QLatin1String(DeviceCatalog::kDemoCameraId);
+    if (wanted && demo && !m_demoCamera.isActive()) {
+        releaseCamera();
+        const QImage image(DeviceCatalog::demoCameraImage());
+        if (image.isNull()) {
+            setCameraError(tr("The demo camera picture can't be read."));
+            return;
+        }
+        setCameraError(QString());
+        const QVideoFrame frame(image.convertToFormat(QImage::Format_RGB32));
+        disconnect(&m_demoCamera, nullptr, this, nullptr);
+        connect(&m_demoCamera, &QTimer::timeout, this, [this, frame] { m_cameraSink.setVideoFrame(frame); });
+        m_demoCamera.start(33);
+        emit cameraActiveChanged();
+        return;
+    }
+    if (!(wanted && demo) && m_demoCamera.isActive()) {
+        m_demoCamera.stop();
+        emit cameraActiveChanged();
+    }
+    if (demo) {
+        return;
+    }
     const std::optional<QCameraDevice> device = DeviceCatalog::findCamera(settings->cameraId());
 
     if (!wanted || !device) {
