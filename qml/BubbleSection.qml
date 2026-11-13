@@ -3,42 +3,22 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 
-// Sidebar section "CAMERA": the bubble's look in Screen + Cam mode (the floating bubble and
-// the starting layout in the editor), framing in Camera-only mode.
+// Sidebar section "CAMERA": how your camera bubble looks — the floating bubble while you
+// record, and the starting look in the editor. The editor reuses it for one part's look.
 SidebarSection {
     id: section
 
     // The style being edited: the app-wide default, or the editor's current segment.
     property var bubbleStyle: BubbleStyle
-    // In the editor: always show the bubble controls, never the Camera-only ones.
+    // In the editor: titled for the part being edited, shown even without a camera setting.
     property bool editorMode: false
 
-    readonly property bool bubbleMode: editorMode || RecordingSettings.mode === RecordingSettings.ScreenAndCamera
-    readonly property bool cameraOnly: !editorMode && RecordingSettings.mode === RecordingSettings.CameraOnly
-
     title: editorMode ? qsTr("Camera look") : qsTr("Camera")
-    visible: editorMode || ((bubbleMode || cameraOnly) && RecordingSettings.cameraId.length > 0)
-
-    // --- Camera-only mode -------------------------------------------------------------
-    Field {
-        label: qsTr("Orientation")
-        visible: section.cameraOnly
-
-        SegmentedControl {
-            Layout.fillWidth: true
-            options: [
-                { value: RecordingSettings.Landscape, label: qsTr("Landscape 16:9") },
-                { value: RecordingSettings.Portrait, label: qsTr("Portrait 9:16") }
-            ]
-            value: RecordingSettings.cameraOnlyOrientation
-            onActivated: (value) => RecordingSettings.cameraOnlyOrientation = value
-        }
-    }
+    visible: editorMode || RecordingSettings.cameraId.length > 0
 
     // --- Bubble ----------------------------------------------------------------------
     Field {
         label: qsTr("Shape")
-        visible: section.bubbleMode
 
         ShapePicker {
             Layout.fillWidth: true
@@ -50,7 +30,6 @@ SidebarSection {
     Field {
         label: qsTr("Size")
         hint: Math.round(section.bubbleStyle.size * 100) + "%"
-        visible: section.bubbleMode
 
         StyledSlider {
             Layout.fillWidth: true
@@ -64,7 +43,6 @@ SidebarSection {
     Field {
         label: qsTr("Corner roundness")
         hint: Math.round(section.bubbleStyle.roundness * 100) + "%"
-        visible: section.bubbleMode
         enabled: section.bubbleStyle.shape !== BubbleStyle.Circle
         opacity: enabled ? 1.0 : 0.4
 
@@ -80,7 +58,6 @@ SidebarSection {
     Field {
         label: qsTr("Border")
         hint: section.bubbleStyle.borderWidth < 0.5 ? qsTr("off") : Math.round(section.bubbleStyle.borderWidth) + " px"
-        visible: section.bubbleMode
 
         StyledSlider {
             Layout.fillWidth: true
@@ -123,7 +100,6 @@ SidebarSection {
 
     StyledSwitch {
         Layout.fillWidth: true
-        visible: section.bubbleMode
         text: qsTr("Drop shadow")
         checked: section.bubbleStyle.shadow
         onToggled: section.bubbleStyle.shadow = checked

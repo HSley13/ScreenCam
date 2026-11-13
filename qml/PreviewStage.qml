@@ -3,18 +3,14 @@ import QtQuick.Controls
 import QtMultimedia
 
 // The big preview on the left: a canvas with the exact aspect ratio of the output video,
-// showing the live screen (and the camera bubble on top), or just the camera.
+// showing the live screen. (Your camera floats on the desktop; you place it in the editor.)
 Rectangle {
     id: stage
 
-    readonly property bool cameraOnly: RecordingSettings.mode === RecordingSettings.CameraOnly
     readonly property real canvasAspect: {
         const out = Capture.outputSize;
         if (out.width > 0 && out.height > 0) {
             return out.width / out.height;
-        }
-        if (cameraOnly) {
-            return RecordingSettings.cameraOnlyOrientation === RecordingSettings.Portrait ? 9 / 16 : 16 / 9;
         }
         return 16 / 9;
     }
@@ -41,7 +37,6 @@ Rectangle {
 
         Label {
             anchors.verticalCenter: parent.verticalCenter
-            visible: RecordingSettings.mode === RecordingSettings.ScreenAndCamera
             text: qsTr("Your camera floats on the desktop — place it exactly in the editor afterwards")
             color: Theme.textMuted
             font.pixelSize: 11
@@ -96,7 +91,6 @@ Rectangle {
                 y: crop.height > 0 ? -crop.y / crop.height * canvas.height : 0
                 width: crop.width > 0 ? canvas.width / crop.width : canvas.width
                 height: crop.height > 0 ? canvas.height / crop.height : canvas.height
-                visible: !stage.cameraOnly
                 fillMode: RecordingSettings.captureTarget === RecordingSettings.Window
                           ? VideoOutput.PreserveAspectFit : VideoOutput.Stretch
 
@@ -104,40 +98,18 @@ Rectangle {
                 Component.onDestruction: Capture.removeScreenPreview(videoSink)
             }
 
-            VideoOutput {
-                id: cameraView
-                anchors.fill: parent
-                visible: stage.cameraOnly
-                fillMode: VideoOutput.PreserveAspectCrop
-                transform: Scale {
-                    origin.x: cameraView.width / 2
-                    xScale: BubbleStyle.mirrored ? -1 : 1
-                }
-
-                Component.onCompleted: Capture.addCameraPreview(videoSink)
-                Component.onDestruction: Capture.removeCameraPreview(videoSink)
-            }
-
             // Shown until frames arrive, or with the reason they don't.
             Column {
                 anchors.centerIn: parent
                 width: parent.width * 0.7
                 spacing: 6
-                visible: stage.cameraOnly ? !Capture.cameraActive : !Capture.screenActive
+                visible: !Capture.screenActive
 
                 Label {
                     width: parent.width
                     horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.WordWrap
-                    text: {
-                        if (stage.cameraOnly) {
-                            if (RecordingSettings.cameraId.length === 0) {
-                                return qsTr("Pick a camera in the sidebar");
-                            }
-                            return Capture.cameraError.length > 0 ? Capture.cameraError : qsTr("Starting camera…");
-                        }
-                        return Capture.screenError.length > 0 ? Capture.screenError : qsTr("Starting screen preview…");
-                    }
+                    text: Capture.screenError.length > 0 ? Capture.screenError : qsTr("Starting screen preview…")
                     color: Theme.textMuted
                     font.pixelSize: 14
                 }

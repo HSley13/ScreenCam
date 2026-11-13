@@ -69,22 +69,20 @@ RecordingController::RecordingController(QObject *parent)
     });
     connect(capture, &CaptureSources::cameraFrameArrived, this, [this](const QVideoFrame &frame) {
         if (m_cameraPipeline.isActive()) {
-            m_cameraPipeline.pushCameraFrame(frame);  // project: its own file
-        } else if (m_pipeline.isActive()) {
-            m_pipeline.pushCameraFrame(frame);  // Camera-only mode
+            m_cameraPipeline.pushCameraFrame(frame);  // camera.mp4, next to screen.mp4
         }
     });
 
     connect(&m_pipeline, &RecordingPipeline::clockStarted, this, [this](qint64 ms) { m_screenClockMs = ms; });
     connect(&m_cameraPipeline, &RecordingPipeline::clockStarted, this, [this](qint64 ms) { m_cameraClockMs = ms; });
     connect(&m_pipeline, &RecordingPipeline::finished, this,
-            [this](const QString &path) { onPipelineDone(false, QString(), path); });
+            [this](const QString &) { onPipelineDone(false, QString()); });
     connect(&m_pipeline, &RecordingPipeline::failed, this,
-            [this](const QString &message) { onPipelineDone(false, message, QString()); });
+            [this](const QString &message) { onPipelineDone(false, message); });
     connect(&m_cameraPipeline, &RecordingPipeline::finished, this,
-            [this](const QString &path) { onPipelineDone(true, QString(), path); });
+            [this](const QString &) { onPipelineDone(true, QString()); });
     connect(&m_cameraPipeline, &RecordingPipeline::failed, this,
-            [this](const QString &message) { onPipelineDone(true, message, QString()); });
+            [this](const QString &message) { onPipelineDone(true, message); });
 }
 
 QString RecordingController::elapsedText() const {
@@ -110,19 +108,22 @@ QString RecordingController::validate() const {
     const RecordingSettings *settings = RecordingSettings::instance();
     const CaptureSources *capture = CaptureSources::instance();
 
-    // Recording feeds frames through QVideoFrameInput, which needs the FFmpeg backend in every mode.
+    // Recording feeds frames through QVideoFrameInput, which needs the FFmpeg backend.
     if (!capture->backendProblem().isEmpty()) {
         return capture->backendProblem();
     }
-    if (settings->mode() == RecordingSettings::CaptureMode::CameraOnly) {
-        if (settings->cameraId().isEmpty()) {
-            return tr("Choose a camera to record in Camera mode.");
-        }
-        if (!capture->cameraActive()) {
-            return capture->cameraError().isEmpty() ? tr("The camera isn't ready yet.") : capture->cameraError();
-        }
-    } else if (!capture->screenError().isEmpty()) {
+    if (!capture->screenError().isEmpty()) {
         return capture->screenError();
+    }
+    // Every recording is screen + you: without a working camera there's nothing to make.
+    if (!DeviceCatalog::instance()->cameraAllowed()) {
+        return tr("ScreenCam isn't allowed to use the camera. Allow it in your system's privacy settings.");
+    }
+    if (settings->cameraId().isEmpty()) {
+        return tr("Choose a camera in the sidebar.");
+    }
+    if (!capture->cameraActive() || capture->cameraResolution().isEmpty()) {
+        return capture->cameraError().isEmpty() ? tr("The camera isn't ready yet.") : capture->cameraError();
     }
     if (capture->outputSize().isEmpty()) {
         return tr("Nothing to record: no screen or camera picture is available.");
@@ -183,43 +184,35 @@ void RecordingController::startPipelines() {
         return core::planEncoder(core::PixelSize{size.width(), size.height()}, fps).averageBitRate;
     };
 
-    // Screen + Camera with a working camera -> an editable project with two separate files.
-    m_projectMode = settings->mode() == RecordingSettings::CaptureMode::ScreenAndCamera && settings->usesCamera() &&
-                    capture->cameraActive() && !capture->cameraResolution().isEmpty();
-
+    // Every recording is an editable project: the screen and the camera in two separate files,
+    // so you can still move yourself around afterwards.
     RecordingPipeline::Request request;
     request.compositor.canvasSize = capture->outputSize();
     request.compositor.sourceCrop = capture->sourceCrop();
     request.compositor.framesPerSecond = fps;
     request.compositor.bubble = BubbleStyle::instance()->snapshot();
-    request.compositor.layout = settings->mode() == RecordingSettings::CaptureMode::CameraOnly
-                                    ? CompositeLayout::CameraOnly
-                                    : CompositeLayout::ScreenOnly;  // projects add the camera later
+    request.compositor.layout = CompositeLayout::ScreenOnly;  // the camera is added at export
     if (DeviceCatalog::instance()->microphoneAllowed()) {
         request.microphone = DeviceCatalog::findMicrophone(settings->microphoneId());
     }
     request.videoBitRate = bitRateFor(request.compositor.canvasSize);
 
-    if (m_projectMode) {
-        m_project = Project{};
-        m_project.folder = nextProjectFolder();
-        if (!QDir().mkpath(m_project.folder)) {
-            setError(tr("Can't create %1.").arg(m_project.folder));
-            finish();
-            return;
-        }
-        m_project.canvasSize = request.compositor.canvasSize;
-        m_project.framesPerSecond = fps;
-        m_project.createdAt = QDateTime::currentDateTime().toString(Qt::ISODate);
-        // First segment: the current bubble look, placed where the floating bubble was.
-        ProjectSegment first;
-        first.style = BubbleStyle::instance()->snapshot();
-        first.style.center = bubbleCenterInTarget();
-        m_project.segments = {first};
-        request.outputPath = m_project.screenPath();
-    } else {
-        request.outputPath = nextOutputPath();
+    m_project = Project{};
+    m_project.folder = nextProjectFolder();
+    if (!QDir().mkpath(m_project.folder)) {
+        setError(tr("Can't create %1.").arg(m_project.folder));
+        finish();
+        return;
     }
+    m_project.canvasSize = request.compositor.canvasSize;
+    m_project.framesPerSecond = fps;
+    m_project.createdAt = QDateTime::currentDateTime().toString(Qt::ISODate);
+    // First segment: the current bubble look, placed where the floating bubble was.
+    ProjectSegment first;
+    first.style = BubbleStyle::instance()->snapshot();
+    first.style.center = bubbleCenterInTarget();
+    m_project.segments = {first};
+    request.outputPath = m_project.screenPath();
 
     m_pendingPipelines = 0;
     m_screenSaved = false;
@@ -237,7 +230,7 @@ void RecordingController::startPipelines() {
     if (screenStarted) {
         m_pendingPipelines++;
     }
-    if (screenStarted && m_projectMode) {
+    if (screenStarted) {
         // The camera's full frame, unmirrored: mirroring and cropping happen at export time.
         const QSize camera = capture->cameraResolution();
         RecordingPipeline::Request cameraRequest;
@@ -261,7 +254,7 @@ void RecordingController::startPipelines() {
     }
 }
 
-void RecordingController::onPipelineDone(bool camera, const QString &error, const QString &path) {
+void RecordingController::onPipelineDone(bool camera, const QString &error) {
     if (m_startingPipelines || m_state == State::Idle) {
         return;  // a request was rejected inside start(): handled by startPipelines()
     }
@@ -272,7 +265,6 @@ void RecordingController::onPipelineDone(bool camera, const QString &error, cons
         m_cameraSaved = error.isEmpty();
     } else {
         m_screenSaved = error.isEmpty();
-        m_directPath = path;
     }
     if (m_pendingPipelines > 0) {
         m_pendingPipelines--;
@@ -281,12 +273,7 @@ void RecordingController::onPipelineDone(bool camera, const QString &error, cons
         return;  // wait for the other file
     }
 
-    if (m_projectMode) {
-        completeProject();
-    } else if (m_screenSaved) {
-        m_lastRecording = m_directPath;
-        emit lastRecordingChanged();
-    }
+    completeProject();
     finish();
 }
 
@@ -448,14 +435,3 @@ QString RecordingController::nextProjectFolder() const {
     return path;
 }
 
-QString RecordingController::nextOutputPath() const {
-    // "ScreenCam 2026-11-12 at 18.42.05.mp4" — sorts by date, no characters Windows rejects.
-    const QDir folder(RecordingSettings::instance()->outputFolder());
-    const QString stem = QStringLiteral("ScreenCam %1")
-                             .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd 'at' HH.mm.ss")));
-    QString path = folder.filePath(stem + QStringLiteral(".mp4"));
-    for (int i = 2; QFileInfo::exists(path); i++) {
-        path = folder.filePath(QStringLiteral("%1 (%2).mp4").arg(stem).arg(i));
-    }
-    return path;
-}

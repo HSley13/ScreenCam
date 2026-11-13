@@ -53,11 +53,13 @@ RecordingSettings::RecordingSettings(QObject *parent)
     const QString defaultCamera = DeviceCatalog::idOf(QMediaDevices::defaultVideoInput());
     const QString defaultMicrophone = DeviceCatalog::idOf(QMediaDevices::defaultAudioInput());
 
-    m_mode = static_cast<CaptureMode>(m_store.value("mode", static_cast<int>(m_mode)).toInt());
     m_screenId = m_store.value("screen", DeviceCatalog::idOf(QGuiApplication::primaryScreen())).toString();
     m_captureTarget = static_cast<CaptureTarget>(m_store.value("captureTarget", static_cast<int>(m_captureTarget)).toInt());
     m_region = m_store.value("region", QRect()).toRect();
     m_cameraId = m_store.value("camera", defaultCamera).toString();
+    if (m_cameraId.isEmpty()) {
+        m_cameraId = defaultCamera;  // recordings always include you: never start without a camera
+    }
     m_microphoneId = m_store.value("microphone", defaultMicrophone).toString();
     m_resolution = m_store.value("resolution", m_resolution).toInt();
     m_frameRate = m_store.value("frameRate", m_frameRate).toInt();
@@ -65,8 +67,6 @@ RecordingSettings::RecordingSettings(QObject *parent)
     m_hideWindowWhileRecording = m_store.value("hideWindow", m_hideWindowWhileRecording).toBool();
     m_showPointer = m_store.value("showPointer", m_showPointer).toBool();
     m_highlightPointer = m_store.value("highlightPointer", m_highlightPointer).toBool();
-    m_cameraOnlyOrientation =
-        static_cast<Orientation>(m_store.value("cameraOnlyOrientation", static_cast<int>(m_cameraOnlyOrientation)).toInt());
     m_outputFolder = m_store.value("outputFolder", defaultOutputFolder()).toString();
 }
 
@@ -78,10 +78,6 @@ void RecordingSettings::assign(T &field, const T &value, const char *key, void (
     field = value;
     m_store.setValue(QLatin1StringView(key), toStored(value));
     emit(this->*changed)();
-}
-
-void RecordingSettings::setMode(CaptureMode mode) {
-    assign(m_mode, mode, "mode", &RecordingSettings::modeChanged);
 }
 
 void RecordingSettings::setScreenId(const QString &id) {
@@ -126,11 +122,6 @@ void RecordingSettings::setShowPointer(bool show) {
 
 void RecordingSettings::setHighlightPointer(bool highlight) {
     assign(m_highlightPointer, highlight, "highlightPointer", &RecordingSettings::highlightPointerChanged);
-}
-
-void RecordingSettings::setCameraOnlyOrientation(Orientation orientation) {
-    assign(m_cameraOnlyOrientation, orientation, "cameraOnlyOrientation",
-           &RecordingSettings::cameraOnlyOrientationChanged);
 }
 
 QUrl RecordingSettings::outputFolderUrl() const {

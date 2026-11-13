@@ -131,20 +131,15 @@ ApplicationWindow {
         anchors.fill: parent
     }
 
-    // Recording controls on their own, when there's no camera bubble to carry them.
-    MiniControlBar {
-        bubbleShown: floatingBubble.visible
-    }
-
     // The name of the screen, window or region being recorded, shown on it.
     TargetTag {}
 
-    // Your camera, floating on the desktop (only in Screen + Camera mode), with the
-    // recording controls attached while recording.
+    // Your camera, floating on the desktop, with the recording controls attached while
+    // recording. (It steps aside while you work in an editor window — never mid-recording:
+    // it carries the Stop button.)
     FloatingBubble {
-        id: floatingBubble
-        visible: !window.editing && RecordingSettings.mode === RecordingSettings.ScreenAndCamera
-                 && RecordingSettings.cameraId.length > 0 && Devices.cameraAllowed
+        visible: RecordingSettings.cameraId.length > 0 && Devices.cameraAllowed
+                 && (Recorder.busy || !window.editing)
     }
 
     function bringToFront() {

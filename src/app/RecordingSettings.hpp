@@ -17,7 +17,6 @@ class RecordingSettings : public QObject {
     QML_ELEMENT
     QML_SINGLETON
 
-    Q_PROPERTY(CaptureMode mode READ mode WRITE setMode NOTIFY modeChanged)
     Q_PROPERTY(QString screenId READ screenId WRITE setScreenId NOTIFY screenIdChanged)
     Q_PROPERTY(CaptureTarget captureTarget READ captureTarget WRITE setCaptureTarget NOTIFY captureTargetChanged)
     // Region to record, in the selected screen's logical coordinates (empty = none chosen yet).
@@ -32,20 +31,10 @@ class RecordingSettings : public QObject {
     // The mouse pointer in the video, and a yellow halo around it to point things out.
     Q_PROPERTY(bool showPointer READ showPointer WRITE setShowPointer NOTIFY showPointerChanged)
     Q_PROPERTY(bool highlightPointer READ highlightPointer WRITE setHighlightPointer NOTIFY highlightPointerChanged)
-    Q_PROPERTY(Orientation cameraOnlyOrientation READ cameraOnlyOrientation WRITE setCameraOnlyOrientation NOTIFY
-                   cameraOnlyOrientationChanged)
     Q_PROPERTY(QString outputFolder READ outputFolder NOTIFY outputFolderChanged)
     Q_PROPERTY(QUrl outputFolderUrl READ outputFolderUrl WRITE setOutputFolderUrl NOTIFY outputFolderChanged)
 
 public:
-    /// What ends up in the video.
-    enum class CaptureMode {
-        ScreenAndCamera,  // screen + camera bubble
-        ScreenOnly,
-        CameraOnly,       // just you, in landscape or portrait
-    };
-    Q_ENUM(CaptureMode)
-
     /// Which part of the desktop is recorded.
     enum class CaptureTarget {
         Screen,  // a whole display: every app on it
@@ -54,18 +43,9 @@ public:
     };
     Q_ENUM(CaptureTarget)
 
-    /// Mirrors screencam::core::CameraOrientation (same values) for QML.
-    enum class Orientation {
-        Landscape,
-        Portrait,
-    };
-    Q_ENUM(Orientation)
-
     static RecordingSettings *instance();
     static RecordingSettings *create(QQmlEngine *qmlEngine, QJSEngine *jsEngine);
 
-    CaptureMode mode() const { return m_mode; }
-    void setMode(CaptureMode mode);
     QString screenId() const { return m_screenId; }
     void setScreenId(const QString &id);
     CaptureTarget captureTarget() const { return m_captureTarget; }
@@ -88,14 +68,10 @@ public:
     void setShowPointer(bool show);
     bool highlightPointer() const { return m_highlightPointer; }
     void setHighlightPointer(bool highlight);
-    Orientation cameraOnlyOrientation() const { return m_cameraOnlyOrientation; }
-    void setCameraOnlyOrientation(Orientation orientation);
     QString outputFolder() const { return m_outputFolder; }
     QUrl outputFolderUrl() const;
     void setOutputFolderUrl(const QUrl &url);
 
-    bool usesScreen() const { return m_mode != CaptureMode::CameraOnly; }
-    bool usesCamera() const { return m_mode != CaptureMode::ScreenOnly && !m_cameraId.isEmpty(); }
 
     /// [{ value: <preset>, label: "1080p" }, ...] for the resolution picker.
     Q_INVOKABLE QVariantList resolutionOptions() const;
@@ -103,7 +79,6 @@ public:
     Q_INVOKABLE void openOutputFolder() const;
 
 signals:
-    void modeChanged();
     void screenIdChanged();
     void captureTargetChanged();
     void regionChanged();
@@ -115,7 +90,6 @@ signals:
     void hideWindowWhileRecordingChanged();
     void showPointerChanged();
     void highlightPointerChanged();
-    void cameraOnlyOrientationChanged();
     void outputFolderChanged();
 
 private:
@@ -126,7 +100,6 @@ private:
     void assign(T &field, const T &value, const char *key, void (RecordingSettings::*changed)());
 
     QSettings m_store;
-    CaptureMode m_mode = CaptureMode::ScreenAndCamera;
     QString m_screenId;
     CaptureTarget m_captureTarget = CaptureTarget::Screen;
     QRect m_region;
@@ -138,6 +111,5 @@ private:
     bool m_hideWindowWhileRecording = true;
     bool m_showPointer = true;
     bool m_highlightPointer = false;
-    Orientation m_cameraOnlyOrientation = Orientation::Landscape;
     QString m_outputFolder;
 };

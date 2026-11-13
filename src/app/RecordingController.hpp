@@ -87,23 +87,20 @@ private:
     void beginRecording();
     void startPipelines();
     /// One pipeline closed its file (error empty) or failed.
-    void onPipelineDone(bool camera, const QString &error, const QString &path);
+    void onPipelineDone(bool camera, const QString &error);
     void completeProject();
     void finish();
     void setState(State state);
     void setError(const QString &message);
-    QString nextOutputPath() const;
     QString nextProjectFolder() const;
     qint64 activeMilliseconds() const;
 
     RecordingPipeline m_pipeline;        // the video (direct modes) or screen.mp4 (projects)
     RecordingPipeline m_cameraPipeline;  // camera.mp4 (projects only)
-    bool m_projectMode = false;
     bool m_startingPipelines = false;  // ignore synchronous failures while start() runs
     int m_pendingPipelines = 0;        // still writing their file
     bool m_screenSaved = false;
     bool m_cameraSaved = false;
-    QString m_directPath;
     qint64 m_screenClockMs = -1;
     qint64 m_cameraClockMs = -1;
     qint64 m_recordedMs = 0;

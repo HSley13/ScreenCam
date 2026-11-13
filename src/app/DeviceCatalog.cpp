@@ -56,7 +56,7 @@ void DeviceCatalog::watchScreen(QScreen *screen) {
 }
 
 QVariantList DeviceCatalog::cameras() const {
-    QVariantList list{entry(QString(), tr("No camera"))};
+    QVariantList list;  // no "No camera": every recording has you in it
     for (const QCameraDevice &device : QMediaDevices::videoInputs()) {
         list.append(entry(idOf(device), device.description()));
     }
