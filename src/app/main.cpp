@@ -1,4 +1,6 @@
 // Entry point: create the application, pick a style, load the QML front end.
+#include "app/QmlHotReloader.hpp"
+
 #include <QApplication>
 #include <QFileOpenEvent>
 #include <QCommandLineParser>
@@ -98,12 +100,21 @@ int main(int argc, char *argv[]) {
         }
     });
 
+    // Only the first load is fatal: a broken edit during hot reload just waits for a fix.
+    bool started = false;
     QObject::connect(
         &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
-        [] {
-            QCoreApplication::exit(EXIT_FAILURE);
+        [&started] {
+            if (!started) {
+                QCoreApplication::exit(EXIT_FAILURE);
+            }
         },
         Qt::QueuedConnection);
+
+#if defined(SCREENCAM_QML_SOURCE_DIR)
+    QmlHotReloader hotReloader(&engine, QStringLiteral(SCREENCAM_QML_SOURCE_DIR),
+                               QStringLiteral(SCREENCAM_HOT_RELOAD_DIR));
+#endif
     FileOpenHandler fileOpenHandler(&engine);
     app.installEventFilter(&fileOpenHandler);
     QCoreApplication::processEvents();  // a Finder double-click may already be waiting
@@ -114,6 +125,7 @@ int main(int argc, char *argv[]) {
     // Main.qml declares `initialProject`; it switches to the editor when it's set.
     engine.setInitialProperties({{QStringLiteral("initialProject"), initialProject}});
     engine.loadFromModule("ScreenCam", "Main");
+    started = !engine.rootObjects().isEmpty();
 
     if (parser.isSet(selfTest)) {
         const QString screenshotPath = parser.value(screenshot);

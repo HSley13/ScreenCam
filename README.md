@@ -78,6 +78,9 @@ ctest --preset default                                     # tests (run headless
 
 `SCREENCAM_DEMO_CAMERA=picture.png` adds a stand-in camera for machines without a webcam.
 
+Debug builds reload the UI when you save a `.qml` file (the terminal shows `[hot reload] reloaded`,
+or the error to fix); C++ changes still need a rebuild.
+
 ## Troubleshooting
 
 - **Black preview / "built without the FFmpeg backend"** — your Qt lacks Qt Multimedia's FFmpeg

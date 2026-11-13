@@ -153,6 +153,7 @@ if(SCREENCAM_BUILD_APP)
         src/app/DeviceCatalog.cpp src/app/DeviceCatalog.hpp
         src/app/ExcludingScreenCapture.hpp
         src/app/ProjectEditor.cpp src/app/ProjectEditor.hpp
+        src/app/QmlHotReloader.cpp src/app/QmlHotReloader.hpp
         src/app/RecordingController.cpp src/app/RecordingController.hpp
         src/app/RecordingLibrary.cpp src/app/RecordingLibrary.hpp
         src/app/RecordingSettings.cpp src/app/RecordingSettings.hpp
@@ -261,6 +262,13 @@ if(SCREENCAM_BUILD_APP)
     # src/app too: the generated QML type registrations include the headers by file name.
     target_include_directories(ScreenCam PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/src/app)
     target_compile_definitions(ScreenCam PRIVATE SCREENCAM_VERSION="${PROJECT_VERSION}")
+    # Debug builds reload the UI when a .qml file is saved (see QmlHotReloader).
+    option(SCREENCAM_QML_HOT_RELOAD "Reload QML from the source tree on save (Debug builds)" ON)
+    if(SCREENCAM_QML_HOT_RELOAD AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+        target_compile_definitions(ScreenCam PRIVATE
+            SCREENCAM_QML_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+            SCREENCAM_HOT_RELOAD_DIR="${CMAKE_CURRENT_BINARY_DIR}/hot-reload")
+    endif()
     if(SCREENCAM_HAS_EXPORT)
         target_link_libraries(ScreenCam PRIVATE screencam_export)
     endif()
