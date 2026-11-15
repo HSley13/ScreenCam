@@ -19,3 +19,6 @@ CMakeUserPresets.json
 
 # Third-party sources/builds made by scripts/ (safe to delete)
 .deps/
+graphify-out/
+.claude/
+CLAUDE.md

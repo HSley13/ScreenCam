@@ -1,72 +1,70 @@
 {
-  "version": 6,
-  "cmakeMinimumRequired": { "major": 3, "minor": 25, "patch": 0 },
-  "configurePresets": [
-    {
-      "name": "base",
-      "hidden": true,
-      "generator": "Unix Makefiles",
-      "cacheVariables": {
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "SCREENCAM_BUILD_TESTS": "ON"
-      }
-    },
-    {
-      "name": "default",
-      "displayName": "Debug → build/",
-      "description": "Day-to-day build. Lives in build/ so clangd finds build/compile_commands.json.",
-      "inherits": "base",
-      "binaryDir": "${sourceDir}/build",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
-    },
-    {
-      "name": "release",
-      "displayName": "Release → build/release/",
-      "description": "Optimized build for installing and packaging.",
-      "inherits": "base",
-      "binaryDir": "${sourceDir}/build/release",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
-    }
-  ],
-  "buildPresets": [
-    { "name": "default", "configurePreset": "default", "jobs": 8 },
-    { "name": "release", "configurePreset": "release", "jobs": 8 }
-  ],
-  "testPresets": [
-    {
-      "name": "default",
-      "configurePreset": "default",
-      "output": { "outputOnFailure": true },
-      "environment": { "QT_QPA_PLATFORM": "offscreen" }
-    },
-    {
-      "name": "release",
-      "inherits": "default",
-      "configurePreset": "release"
-    }
-  ],
-  "packagePresets": [
-    { "name": "release", "configurePreset": "release" }
-  ],
-  "workflowPresets": [
-    {
-      "name": "default",
-      "displayName": "Configure + build + test (Debug)",
-      "steps": [
-        { "type": "configure", "name": "default" },
-        { "type": "build", "name": "default" },
-        { "type": "test", "name": "default" }
-      ]
-    },
-    {
-      "name": "release",
-      "displayName": "Configure + build + test + package (Release)",
-      "steps": [
-        { "type": "configure", "name": "release" },
-        { "type": "build", "name": "release" },
-        { "type": "test", "name": "release" },
-        { "type": "package", "name": "release" }
-      ]
-    }
-  ]
+    "version": 6,
+    "cmakeMinimumRequired": { "major": 3, "minor": 25, "patch": 0 },
+    "configurePresets": [
+        {
+            "name": "base",
+            "hidden": true,
+            "generator": "Unix Makefiles",
+            "cacheVariables": {
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "SCREENCAM_BUILD_TESTS": "ON"
+            }
+        },
+        {
+            "name": "default",
+            "displayName": "Debug → build/",
+            "description": "Day-to-day build. Lives in build/ so clangd finds build/compile_commands.json.",
+            "inherits": "base",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+        },
+        {
+            "name": "release",
+            "displayName": "Release → build/release/",
+            "description": "Optimized build for installing and packaging.",
+            "inherits": "base",
+            "binaryDir": "${sourceDir}/build/release",
+            "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+        }
+    ],
+    "buildPresets": [
+        { "name": "default", "configurePreset": "default", "jobs": 8 },
+        { "name": "release", "configurePreset": "release", "jobs": 8 }
+    ],
+    "testPresets": [
+        {
+            "name": "default",
+            "configurePreset": "default",
+            "output": { "outputOnFailure": true },
+            "environment": { "QT_QPA_PLATFORM": "offscreen" }
+        },
+        {
+            "name": "release",
+            "inherits": "default",
+            "configurePreset": "release"
+        }
+    ],
+    "packagePresets": [{ "name": "release", "configurePreset": "release" }],
+    "workflowPresets": [
+        {
+            "name": "default",
+            "displayName": "Configure + build + test (Debug)",
+            "steps": [
+                { "type": "configure", "name": "default" },
+                { "type": "build", "name": "default" },
+                { "type": "test", "name": "default" }
+            ]
+        },
+        {
+            "name": "release",
+            "displayName": "Configure + build + test + package (Release)",
+            "steps": [
+                { "type": "configure", "name": "release" },
+                { "type": "build", "name": "release" },
+                { "type": "test", "name": "release" },
+                { "type": "package", "name": "release" }
+            ]
+        }
+    ]
 }

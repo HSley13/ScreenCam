@@ -1,14 +1,14 @@
 #include "app/QmlHotReloader.hpp"
 
 #include <QApplication>
-#include <QFileOpenEvent>
 #include <QCommandLineParser>
+#include <QFileOpenEvent>
 #include <QIcon>
-#include <QQmlError>
-#include <QTimer>
 #include <QQmlApplicationEngine>
+#include <QQmlError>
 #include <QQuickStyle>
 #include <QQuickWindow>
+#include <QTimer>
 
 namespace {
 
@@ -44,7 +44,7 @@ private:
     QString m_pending;
 };
 
-}  // namespace
+} // namespace
 
 int main(int argc, char *argv[]) {
     // Not QGuiApplication: Qt.labs.platform's tray icon uses Qt Widgets on Windows and Linux.
@@ -65,7 +65,8 @@ int main(int argc, char *argv[]) {
     parser.addVersionOption();
     const QCommandLineOption selfTest(
         QStringLiteral("self-test"),
-        QStringLiteral("Load the UI, run for two seconds and exit; non-zero if QML reported any warning (used by CTest/CI)."));
+        QStringLiteral(
+            "Load the UI, run for two seconds and exit; non-zero if QML reported any warning (used by CTest/CI)."));
     parser.addOption(selfTest);
     const QCommandLineOption screenshot(
         QStringLiteral("screenshot"),
@@ -113,7 +114,7 @@ int main(int argc, char *argv[]) {
 #endif
     FileOpenHandler fileOpenHandler(&engine);
     app.installEventFilter(&fileOpenHandler);
-    QCoreApplication::processEvents();  // a Finder double-click may already be waiting
+    QCoreApplication::processEvents(); // a Finder double-click may already be waiting
     if (initialProject.isEmpty()) {
         initialProject = fileOpenHandler.takePending();
     }
@@ -131,7 +132,8 @@ int main(int argc, char *argv[]) {
                     window->grabWindow().save(screenshotPath);
                 }
             }
-            qInfo().noquote() << (ok ? "self-test passed" : "self-test FAILED") << "-" << qmlWarnings << "QML warning(s)";
+            qInfo().noquote() << (ok ? "self-test passed" : "self-test FAILED") << "-" << qmlWarnings
+                              << "QML warning(s)";
             QCoreApplication::exit(ok ? EXIT_SUCCESS : EXIT_FAILURE);
         });
     }

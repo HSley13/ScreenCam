@@ -85,7 +85,7 @@ or the error to fix); C++ changes still need a rebuild.
 
 - **Black preview / "built without the FFmpeg backend"** — your Qt lacks Qt Multimedia's FFmpeg
   plugin. Use Qt from the Online Installer, or `scripts/build-qt-ffmpeg.sh`.
-- **macOS keeps asking for Screen Recording** — allow ScreenCam in *System Settings ▸ Privacy &
-  Security ▸ Screen & System Audio Recording*, then quit (⌘Q) and reopen it.
+- **macOS keeps asking for Screen Recording** — allow ScreenCam in _System Settings ▸ Privacy &
+  Security ▸ Screen & System Audio Recording_, then quit (⌘Q) and reopen it.
 - **Linux** — apps can't hide their own windows from a screen recording there; record a window
   or a region next to ScreenCam instead.
